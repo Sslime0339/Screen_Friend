@@ -38,15 +38,15 @@ class Program
             ConfigFlags.MousePassthroughWindow |
             ConfigFlags.UndecoratedWindow |
             ConfigFlags.TransparentWindow |
-            ConfigFlags.TopmostWindow |
-            ConfigFlags.MaximizedWindow
+            ConfigFlags.TopmostWindow //|
+            //ConfigFlags.FullscreenMode
             );
 
-
+        
 
         // Инициализация окна: ширина, высота, заголовок
-        Raylib.InitWindow(1600, 850, "Привет Raylib-cs!");
-        Raylib.SetTargetFPS(60);
+        Raylib.InitWindow(1600, 860, "Привет Raylib-cs!");
+        Raylib.SetTargetFPS(30);
 
 
 
@@ -92,7 +92,7 @@ class Program
         var hookTask = hook.RunAsync();
 
         // ЦЕНТРАЛЬНЫЙ ФИЗИЧЕСКИЙ ЦИКЛ (Обновление со скоростью ~60 FPS)
-        float dt = 0.016f; // Шаг времени (16 мс)
+        float dt = 0.016f * 2; // Шаг времени (16 мс)
         while (_isRunning)
         {
             UpdatePhysics(dt);
@@ -113,18 +113,20 @@ class Program
             Raylib.DrawCircle(0, 0, 50, Color.Maroon);
             Raylib.DrawCircle(1600, 0, 50, Color.Maroon);
             Raylib.DrawCircle(0, 900, 50, Color.Maroon);
-            Raylib.DrawCircle(400, 300, 50, Color.Maroon);
+            Raylib.DrawCircle(1600, 900, 50, Color.Maroon);
 
 
+            Raylib.DrawCircle(200, 860, 50, Color.Maroon);
 
-
-            foreach (var box in _boxes)
+            lock (_lock)
             {
-                Raylib.DrawRectangle((int)box.X - BoxSize / 2, (int)box.Y - BoxSize / 2, BoxSize, BoxSize, Color.Brown);
+                foreach (var box in _boxes)
+                {
+                    Raylib.DrawRectangle((int)box.X - BoxSize / 2, (int)box.Y - BoxSize / 2, BoxSize, BoxSize, Color.Brown);
 
-                //Console.WriteLine(box.Y);dwasda
+                    //Console.WriteLine(box.Y);dwasda
+                }
             }
-
 
 
 
@@ -285,7 +287,7 @@ class Program
     {
         const float Gravity = 980;     // Сила гравитации (пиксели/сек^2)
         const float Friction = 1.00f;    // Сопротивление воздуха (затухание)
-        const int GroundY = 500;        // Условный пол (высота экрана)
+        const int GroundY = 860;        // Условный пол (высота экрана)
 
         lock (_lock)
         {
@@ -303,9 +305,9 @@ class Program
                 box.Y += (int)(box.Vy * dt);
 
                 // Столкновение с полом
-                if (box.Y >= GroundY)
+                if (box.Y + BoxSize / 2 >= GroundY)
                 {
-                    box.Y = GroundY;
+                    box.Y = GroundY - BoxSize / 2;
                     box.Vy = -box.Vy * 1.0f; // Отскок от пола с потерей энергии (0.5)
                     box.Vy -= Gravity * dt;
 
