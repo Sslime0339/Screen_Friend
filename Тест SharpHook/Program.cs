@@ -43,11 +43,6 @@ namespace Тест_SharpHook
                     }
                     else if (keyInfo.Key == ConsoleKey.B)
                     {
-                        // Меняем условие блокировки
-                        _shouldBlockClicks = !_shouldBlockClicks;
-                        Console.ForegroundColor = _shouldBlockClicks ? ConsoleColor.Red : ConsoleColor.Green;
-                        Console.WriteLine($"\n[ЦИКЛ] Статус блокировки кликов изменен: {_shouldBlockClicks}");
-                        Console.ResetColor();
                     }
                 }
 
@@ -65,6 +60,8 @@ namespace Тест_SharpHook
         // Обработчик движения мыши
         private static void OnMouseMoved(object? sender, MouseHookEventArgs e)
         {
+            //Thread.Sleep(2000);
+            //await Task.Delay(3000);
             // Выводим координаты (e.Data.X, e.Data.Y)
             Console.Title = $"Мышь: X={e.Data.X}, Y={e.Data.Y} | Блокировка: {_shouldBlockClicks}";
         }
@@ -72,7 +69,11 @@ namespace Тест_SharpHook
         // Обработчик кликов мыши
         private static void OnMousePressed(object? sender, MouseHookEventArgs e)
         {
+            //await Task.Delay(9000);
+            //Thread.Sleep(2000);
+
             Console.WriteLine($"[ХУК] Нажата кнопка мыши: {e.Data.Button} в точке ({e.Data.X}, {e.Data.Y})");
+
 
             // Проверяем наше условие
             if (_shouldBlockClicks)
@@ -86,6 +87,15 @@ namespace Тест_SharpHook
         // Обработчик клавиатуры (глобальный)
         private static void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
         {
+            if (e.Data.KeyCode == SharpHook.Data.KeyCode.VcB)
+            {
+
+                // Меняем условие блокировки
+                _shouldBlockClicks = !_shouldBlockClicks;
+                Console.ForegroundColor = _shouldBlockClicks ? ConsoleColor.Red : ConsoleColor.Green;
+                Console.WriteLine($"\n[ЦИКЛ] Статус блокировки кликов изменен: {_shouldBlockClicks}");
+                Console.ResetColor();
+            }
             // e.Data.KeyCode содержит код клавиши (например, KeyCode.VcQ)
             Console.WriteLine($"[ХУК] Нажата клавиша: {e.Data.KeyCode}");
         }

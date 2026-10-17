@@ -21,7 +21,8 @@ namespace Тест_Raylib_cs
                 ConfigFlags.UndecoratedWindow |
                 ConfigFlags.TransparentWindow |
                 ConfigFlags.TopmostWindow |
-                ConfigFlags.FullscreenMode
+                ConfigFlags.FullscreenMode //|
+                //ConfigFlags.UnfocusedWindow
                 );
 
 

@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 
 using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using MouseButton = SharpHook.Data.MouseButton;
 using Point = System.Drawing.Point;
@@ -13,6 +15,101 @@ using Point = System.Drawing.Point;
 
 class Program
 {
+
+
+    delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc enumFunc, IntPtr lParam);
+
+    // Возвращает true, если окно развёрнуто на весь экран
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsZoomed(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    //[DllImport("user32.dll")]
+    //[return: MarshalAs(UnmanagedType.Bool)]
+    //private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+
+
+
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out bool pvAttribute, int cbAttribute);
+
+    /*
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    */
+
+
+
+
+    // Константа, указывающая, что нам нужны точные видимые границы окна
+    private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    // Импорт функции из dwmapi.dll
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(
+        IntPtr hwnd,
+        int dwAttribute,
+        out RECT pvAttribute,
+        int cbAttribute
+    );
+
+    // Удобный метод-обёртка
+    public static bool GetExactWindowRect(IntPtr hWnd, out RECT rect)
+    {
+        // Передаем размер структуры в байтах (cbAttribute)
+        int result = DwmGetWindowAttribute(
+            hWnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            out rect,
+            Marshal.SizeOf(typeof(RECT))
+        );
+
+        // В WinAPI 0 (S_OK) означает успех
+        return result == 0;
+    }
+
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     private static volatile bool _isRunning = true;
 
     // Список всех созданных ящиков
@@ -46,8 +143,12 @@ class Program
 
         // Инициализация окна: ширина, высота, заголовок
         Raylib.InitWindow(1600, 860, "Привет Raylib-cs!");
-        Raylib.SetTargetFPS(30);
+        Raylib.SetTargetFPS(2);
 
+        unsafe
+        {
+            IntPtr RaylibWindowPtr = (IntPtr)Raylib.GetWindowHandle();
+        }
 
 
 
@@ -69,6 +170,49 @@ class Program
 
 
 
+
+        // 1. Загружаем ВСЕ кадры GIF в одну структуру Image (кадры идут друг за другом по вертикали)
+        Image imBoxAnim = Raylib.LoadImageAnim("resources/box.gif", out int framesBox);
+
+        int frameWidth = imBoxAnim.Width;
+        int frameHeight = imBoxAnim.Height;
+
+        // 2. Создаем текстуру на основе первого кадра
+        Texture2D[] texBoxAnim = new Texture2D[framesBox];
+
+        // Вычисляем адрес памяти, где начинается следующий кадр в imGifAnim.Data
+        // Формат GIF в raylib всегда загружается как RGBA (4 байта на пиксель)
+        int frameSize = imBoxAnim.Width * imBoxAnim.Height * 4;
+
+        for (int i = 0; i < framesBox; i++)
+        {
+            unsafe
+            {
+                byte* basePtr = (byte*)imBoxAnim.Data;
+
+                // Вырезаем каждый кадр отдельно
+                Image singleFrameImg = new Image
+                {
+                    Data = basePtr + (i * frameSize),
+                    Width = frameWidth,
+                    Height = frameHeight,
+                    Mipmaps = 1,
+                    Format = PixelFormat.UncompressedR8G8B8A8
+                };
+
+                // Загружаем кадр прямиком в VRAM видеокарты
+                texBoxAnim[i] = Raylib.LoadTextureFromImage(singleFrameImg);
+            }
+        }
+
+        // 1. Исходный размер кадра (внутри самого GIF / текстуры)
+        Rectangle sourceRec = new Rectangle(0.0f, 0.0f, texBoxAnim[0].Width, texBoxAnim[0].Height);
+        
+
+        // --- НАСТРОЙКИ ВРЕМЕНИ АНИМАЦИИ ---
+        int currentAnimFrame = 0;
+        float timeCount = 0.0f;           // Переменная для накопления прошедшего времени
+        float frameDuration = 0.02f;       // Длительность ОДНОГО кадра GIF в секундах (0.1с = 100мс)
 
 
 
@@ -92,10 +236,9 @@ class Program
         var hookTask = hook.RunAsync();
 
         // ЦЕНТРАЛЬНЫЙ ФИЗИЧЕСКИЙ ЦИКЛ (Обновление со скоростью ~60 FPS)
-        float dt = 0.016f * 2; // Шаг времени (16 мс)
+        //float dt = 0.016f; // Шаг времени (16 мс)
         while (_isRunning)
         {
-            UpdatePhysics(dt);
             // 2. Отрисовка
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.Blank);
@@ -118,20 +261,210 @@ class Program
 
             Raylib.DrawCircle(200, 860, 50, Color.Maroon);
 
+
+
+
+
+
+
+
+            /*
+
+            List<string> windowList = new List<string>();
+
+            EnumWindows((hWnd, lParam) =>
+            {
+                // Проверка на свёрнуто ли окно
+                bool isNotMinimized = !IsIconic(hWnd);
+
+                //int GWL_STYLE = -16;
+                //uint WS_MAXIMIZE = 0x01000000;
+                
+                
+                //int style = GetWindowLong(hWnd, GWL_STYLE);
+                //bool IsWindowMaximized = (style & WS_MAXIMIZE) == WS_MAXIMIZE;
+
+                bool IsWindowMaximized = IsZoomed(hWnd);
+
+                int width = 0;
+                int height = 0;
+
+                int x = 0;
+                int y = 0;
+
+                // Использование:
+                if (GetExactWindowRect(hWnd, out RECT rect) && IsWindowVisible(hWnd) && isNotMinimized)
+                {
+                    width = rect.Right - rect.Left;
+                    height = rect.Bottom - rect.Top;
+                    x = rect.Left;
+                    y = rect.Top;
+                    //int x = rect.Left
+                    //int y = 
+                    //Console.WriteLine($"Размеры окна: {width}x{height}");
+                    StringBuilder sb = new StringBuilder(256);
+                    int length = GetWindowText(hWnd, sb, sb.Capacity);
+                    string title = sb.ToString();
+
+                    if (!((width == 1600 && height == 900) ||
+                    (width == 1600 && height == 860)))
+                    {
+
+                        if (!IsWindowMaximized)
+                            Raylib.DrawRectangle(x, y, width, height, new Color(10, 20, 255, 20));
+                        //else
+                        //Raylib.DrawRectangle(x, y, width, height, new Color(255, 20, 255, 200));
+
+                        Console.WriteLine($"[{isNotMinimized}] [Zoom:{IsZoomed(hWnd)}] [{x}:{y}] [{width};{height}] {hWnd}: {title}");
+                    }
+                }
+
+
+
+                if (IsWindowVisible(hWnd))
+                {
+                    //StringBuilder sb = new StringBuilder(256);
+                    //int length = GetWindowText(hWnd, sb, sb.Capacity);
+                    //string title = sb.ToString();
+
+                    //if (!string.IsNullOrWhiteSpace(title))
+                    //{
+                        //windowList.Add($"[{isNotMinimized}] [Zoom:{IsZoomed(hWnd)}] [{x}:{y}] [{width};{height}] {hWnd}: {title}");
+
+                    //}
+
+
+
+
+                }
+                return true;
+            }, IntPtr.Zero);
+            */
+            /*
+            foreach (var win in windowList)
+            {
+                Console.WriteLine(win);
+            }
+            */
+
+            // Константа для проверки скрытых окон (DWMWA_CLOAKED)
+            const int DWMWA_CLOAKED = 14;
+
+            EnumWindows((hWnd, lParam) => {
+                // 1. Базовая проверка видимости (WinAPI)
+                if (!IsWindowVisible(hWnd)) return true;
+
+                // 2. Проверка заголовка (убирает 80% системного мусора)
+                StringBuilder sb = new StringBuilder(256);
+                GetWindowText(hWnd, sb, sb.Capacity);
+                string title = sb.ToString();
+                if (string.IsNullOrWhiteSpace(title)) return true;
+
+                // 3. Проверка на "Скрытые" (Cloaked) окна Windows 10/11 
+                // (Убирает окна с других виртуальных столов и фоновые UWP-апплеты)
+                DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                if (isCloaked) return true;
+
+                // 4. Проверка геометрии окна
+                if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+
+                int width = rect.Right - rect.Left;
+                int height = rect.Bottom - rect.Top;
+                int x = rect.Left;
+                int y = rect.Top;
+
+                // Исключаем окна с нулевым или слишком маленьким размером
+                if (width <= 16 || height <= 16) return true;
+
+                // Исключаем окна, улетевшие за пределы экрана (координаты -32000)
+                if (x < -10000 || y < -10000) return true;
+
+                // 5. Ваша кастомная фильтрация размеров (из прошлого шага)
+                bool isTargetSize1 = (width == 1600 && height == 900);
+                bool isTargetSize2 = (width == 1600 && height == 860);
+
+                if (!isTargetSize1 && !isTargetSize2)
+                {
+                    bool isNotMinimized = !IsIconic(hWnd);
+                    bool IsWindowMaximized = IsZoomed(hWnd);
+
+                    if (!IsWindowMaximized && isNotMinimized)
+                    {
+                        Raylib.DrawRectangle(x, y, width, height, new Color(10, 20, 255, 50));
+                    }
+
+                    Console.WriteLine($"[{isNotMinimized}] [Zoom:{IsWindowMaximized}] [{x}:{y}] [{width};{height}] {hWnd}: {title}");
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+
+
+
+
+
+
+
+
+
+
+
+
+            // 1. Получаем Delta Time и накапливаем время
+            float deltaTime = Raylib.GetFrameTime();
+            timeCount += deltaTime;
+
+            UpdatePhysics(deltaTime);
+
+
+            // 2. Используем WHILE вместо IF. 
+            // Если игра лагала и накопилось много времени, цикл выполнится несколько раз за один кадр игры
+            while (timeCount >= frameDuration)
+            {
+                currentAnimFrame++;
+                if (currentAnimFrame >= framesBox) currentAnimFrame = 0;
+
+                // Вычитаем длительность кадра и проверяем, нужно ли шагнуть еще дальше
+                timeCount -= frameDuration;
+
+            }
+
+
+            // Рисуем обновленную текстуру по центру экрана
+            //int posX = Raylib.GetScreenWidth() / 2 - texBoxAnim.Width / 2;
+            //int posY = Raylib.GetScreenHeight() / 2 - texBoxAnim.Height / 2;
+
+
+            //Rectangle destRec = new Rectangle(posX, posY, 60, 60);
+
+            // 3. Точка вращения/масштабирования (Vector2.Zero означает левый верхний угол destRec)
+            Vector2 origin = new Vector2(0.0f, 0.0f);
+
+
+            // Рисуем с измененным размером и углом поворота (0.0f)
+            //Raylib.DrawTexturePro(texBoxAnim, sourceRec, destRec, origin, 0.0f, Color.White);
+
+            Raylib.DrawText($"Кадр: {currentAnimFrame + 1}/{framesBox}", 10, 10, 20, Color.DarkGray);
+
+
+
+
+
             lock (_lock)
             {
                 foreach (var box in _boxes)
                 {
-                    Raylib.DrawRectangle((int)box.X - BoxSize / 2, (int)box.Y - BoxSize / 2, BoxSize, BoxSize, Color.Brown);
+                    //Raylib.DrawRectangle((int)box.X - BoxSize / 2, (int)box.Y - BoxSize / 2, BoxSize, BoxSize, Color.Brown);
 
+                    int posX = (int)box.X - BoxSize / 2;
+                    int posY = (int)box.Y - BoxSize / 2;
+
+                    Rectangle destRec = new Rectangle(posX, posY, BoxSize, BoxSize);
+                    Raylib.DrawTexturePro(texBoxAnim[currentAnimFrame], sourceRec, destRec, origin, 0.0f, Color.White);
                     //Console.WriteLine(box.Y);dwasda
                 }
             }
-
-
-
-            
-
 
 
 
@@ -160,7 +493,7 @@ class Program
                 2,  // Расстояние между буквами (spacing)
                 Color.Black);
 
-
+            Raylib.DrawFPS(10, 10);
 
 
             Raylib.EndDrawing();
@@ -169,6 +502,13 @@ class Program
         }
 
 
+        // Очистка ресурсов из оперативной и видеопамяти
+        //Raylib.UnloadTexture(texBoxAnim);
+        for (int i = 0; i < framesBox; i++)
+        {
+            Raylib.UnloadTexture(texBoxAnim[i]);
+        }
+        Raylib.UnloadImage(imBoxAnim);
 
         // 5. Выгрузка шрифта из памяти при выходе
         Raylib.UnloadFont(myFont);
@@ -285,6 +625,7 @@ class Program
     // 5. ДВИЖОК ФИЗИКИ (РАБОТАЕТ В ЦЕНТРАЛЬНОМ ЦИКЛЕ)
     private static void UpdatePhysics(float dt)
     {
+        dt = dt * 0.8f;
         const float Gravity = 980;     // Сила гравитации (пиксели/сек^2)
         const float Friction = 1.00f;    // Сопротивление воздуха (затухание)
         const int GroundY = 860;        // Условный пол (высота экрана)
@@ -309,7 +650,8 @@ class Program
                 {
                     box.Y = GroundY - BoxSize / 2;
                     box.Vy = -box.Vy * 1.0f; // Отскок от пола с потерей энергии (0.5)
-                    box.Vy -= Gravity * dt;
+                    //box.Y += (int)(box.Vy * dt);
+                    //box.Vy -= Gravity * dt;
 
                     // Трение о пол
                     box.Vx *= 0.8f;
