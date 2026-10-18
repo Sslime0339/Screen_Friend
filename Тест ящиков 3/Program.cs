@@ -121,7 +121,7 @@ class Program
 
         // --- СОЗДАНИЕ ГРАНИЦ ЭКРАНА (СТЕНЫ И ПОЛ) ---
         float viewWidthMeters = screenWidth / PixelsPerMeter;
-        float viewHeightMeters = screenHeight / PixelsPerMeter * 8;
+        float viewHeightMeters = screenHeight / PixelsPerMeter;
         float wallThickness = 5.0f; // Толщина стен (в метрах), чтобы коробки не пролетали сквозь них на огромной скорости
 
         float groundHeightMeters = 5f;
@@ -143,7 +143,7 @@ class Program
         // Левая стена (чуть левее X = 0)
         Body leftWall = BodyFactory.CreateRectangle(
             _world,
-            wallThickness, viewHeightMeters,
+            wallThickness, viewHeightMeters * 8,
             1f,
             new XnaVector(-(wallThickness / 2f), viewHeightMeters / 2f)
         );
@@ -154,7 +154,7 @@ class Program
         // Правая стена (чуть правее максимального X)
         Body rightWall = BodyFactory.CreateRectangle(
             _world,
-            wallThickness, viewHeightMeters,
+            wallThickness, viewHeightMeters * 8,
             1f,
             new XnaVector(viewWidthMeters + (wallThickness / 2f), viewHeightMeters / 2f)
         );
