@@ -1,16 +1,13 @@
 ﻿using Genbox.VelcroPhysics.Dynamics;
 using Genbox.VelcroPhysics.Factories;
 using Raylib_cs;
-using SharpHook;
-using SharpHook.Data;
-//using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-//using static System.Net.Mime.MediaTypeNames;
-using MouseButton = SharpHook.Data.MouseButton;
+
 // Псевдонимы типов для исключения конфликтов векторов
 using SysVector = System.Numerics.Vector2;
 using XnaVector = Microsoft.Xna.Framework.Vector2;
@@ -59,23 +56,23 @@ class Program
         public int Bottom;
     }
 
-
-
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetCursorPos(out Point lpPoint);
 
     private struct Point { public int X; public int Y; }
 
+    // WinAPI для глобального отслеживания клавиш и мыши без хуков
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 
-
-
-
-
+    private const int VK_ESCAPE = 0x1B;
+    private const int VK_C = 0x43;
+    private const int VK_LBUTTON = 0x01; // Левая кнопка мыши
 
     // --- Настройки физики и экрана ---
     const float PixelsPerMeter = 50f; // 50 пикселей = 1 метр
-    private const float BoxSizeMeters = 1.2f; // Размер ящика в метрах (1.2м * 50пкс = 60 пикселей)
+    private const float BoxSizeMeters = 1.2f; // Размер ящика в метрах
 
     private static volatile bool _isRunning = true;
     private static World _world;
@@ -86,14 +83,16 @@ class Program
     private static readonly object _lock = new object();
 
     // Состояние мыши и захвата
-
-
     private static long _lastMoveTimestamp = 0;
     private static int _mouseX = 0;
     private static int _mouseY = 0;
     private static int _lastMouseX = 0;
     private static int _lastMouseY = 0;
     private static Body? _draggedBox = null;
+
+    // Состояния для ручной обработки нажатий (эмуляция событий Pressed/Released)
+    private static bool _wasCPressed = false;
+    private static bool _wasLButtonPressed = false;
 
     // Камера для конвертации координат
     private static Camera2D _camera;
@@ -116,21 +115,16 @@ class Program
         // 2. Инициализация физического мира Velcro (Гравитация вниз)
         _world = new World(new XnaVector(0f, 19.6f));
 
-
-
-
         // --- СОЗДАНИЕ ГРАНИЦ ЭКРАНА (СТЕНЫ И ПОЛ) ---
         float viewWidthMeters = screenWidth / PixelsPerMeter;
         float viewHeightMeters = screenHeight / PixelsPerMeter;
-        float wallThickness = 5.0f; // Толщина стен (в метрах), чтобы коробки не пролетали сквозь них на огромной скорости
+        float wallThickness = 5.0f;
 
         float groundHeightMeters = 5f;
         float groundYMeters = screenHeight / PixelsPerMeter + (groundHeightMeters / 2f);
         float groundWidthMeters = screenWidth / PixelsPerMeter;
 
-
-
-        // Нижний пол (чуть ниже видимой границы)
+        // Нижний пол
         Body ground = BodyFactory.CreateRectangle(
             _world,
             groundWidthMeters * 1.2f, groundHeightMeters,
@@ -140,7 +134,7 @@ class Program
         ground.BodyType = BodyType.Static;
         ground.Friction = 0.6f;
 
-        // Левая стена (чуть левее X = 0)
+        // Левая стена
         Body leftWall = BodyFactory.CreateRectangle(
             _world,
             wallThickness, viewHeightMeters * 8,
@@ -151,7 +145,7 @@ class Program
         leftWall.Friction = 0.4f;
         leftWall.Restitution = 0.3f;
 
-        // Правая стена (чуть правее максимального X)
+        // Правая стена
         Body rightWall = BodyFactory.CreateRectangle(
             _world,
             wallThickness, viewHeightMeters * 8,
@@ -161,10 +155,6 @@ class Program
         rightWall.BodyType = BodyType.Static;
         rightWall.Friction = 0.4f;
         rightWall.Restitution = 0.3f;
-
-
-
-
 
         // 3. Настройка камеры Raylib
         _camera = new Camera2D
@@ -181,11 +171,7 @@ class Program
         for (int i = 0; i < 256; i++) codepoints[95 + i] = 0x0400 + i;
         Font myFont = Raylib.LoadFontEx("Arial.ttf", 32, codepoints, codepoints.Length);
 
-
-        int textOffset = 2; // Размер смещения тени в пикселях
-
-
-
+        int textOffset = 2;
 
         // 5. Загрузка GIF анимации
         Image imBoxAnim = Raylib.LoadImageAnim("resources/box.gif", out int framesBox);
@@ -216,27 +202,15 @@ class Program
         float timeCount = 0.0f;
         float frameDuration = 0.02f;
 
-
-
-
-
-
         InitializeMousePosition();
-
-        // 6. Запуск SharpHook глобального перехвата
-        using var hook = new SimpleGlobalHook();
-        hook.KeyPressed += OnKeyPressed;
-        hook.MouseMoved += OnMouseMoved;
-        hook.MouseDragged += OnMouseMoved;
-        hook.MousePressed += OnMousePressed;
-        hook.MouseReleased += OnMouseReleased;
-
-        var hookTask = hook.RunAsync();
 
         // Основной игровой цикл
         while (_isRunning && !Raylib.WindowShouldClose())
         {
             float dt = Raylib.GetFrameTime();
+
+            // --- ОБРАБОТКА ГЛОБАЛЬНОГО ВВОДА (ВЗАМЕН SHARPHOOK) ---
+            UpdateInput();
 
             // --- ОБНОВЛЕНИЕ ФИЗИЧЕСКИХ ОКОН WINDOWS ---
             lock (_lock)
@@ -251,62 +225,52 @@ class Program
                 // 2. Ищем актуальные окна ОС и строим для них новые твердые тела
                 const int DWMWA_CLOAKED = 14;
                 EnumWindows((hWnd, lParam) => {
-                    if (!IsWindowVisible(hWnd)) return true;
-                    StringBuilder sb = new StringBuilder(256);
-                    GetWindowText(hWnd, sb, sb.Capacity);
-                    string title = sb.ToString();
-                    if (string.IsNullOrWhiteSpace(title)) return true;
+                if (!IsWindowVisible(hWnd)) return true;
+                StringBuilder sb = new StringBuilder(256);
+                GetWindowText(hWnd, sb, sb.Capacity);
+                string title = sb.ToString();
+                if (string.IsNullOrWhiteSpace(title)) return true;
 
-                    DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
-                    if (isCloaked) return true;
+                DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                if (isCloaked) return true;
 
-                    if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+                if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
 
-                    int width = rect.Right - rect.Left;
-                    int height = rect.Bottom - rect.Top;
-                    int x = rect.Left;
-                    int y = rect.Top;
+                int width = rect.Right - rect.Left;
+                int height = rect.Bottom - rect.Top;
+                int x = rect.Left;
+                int y = rect.Top;
 
-                    if (width <= 16 || height <= 16) return true;
-                    if (x < -10000 || y < -10000) return true;
+                if (width <= 16 || height <= 16) return true;
+                if (x < -10000 || y < -10000) return true;
 
-                    // Отсекаем само окно Raylib, чтобы оно не создавало физический барьер само себе
-                    if (!((width == 1600 && height == 900) || (width == 1600 && height == 860)))
+                if (!((width == 1600 && height == 900) || (width == 1600 && height == 860)))
+                {
+                    if (!IsZoomed(hWnd) && !IsIconic(hWnd))
                     {
-                        if (!IsZoomed(hWnd) && !IsIconic(hWnd))
-                        {
-                            // Переводим размеры и координаты из пикселей в метры Velcro Physics
-                            float wMeters = width / PixelsPerMeter;
-                            float hMeters = height / PixelsPerMeter;
+                        float wMeters = width / PixelsPerMeter;
+                        float hMeters = height / PixelsPerMeter;
+                        float centerXMeters = (x + width / 2f) / PixelsPerMeter;
+                        float centerYMeters = (y + height / 2f) / PixelsPerMeter;
 
-                            // Вычисляем центр прямоугольника окна (так как Velcro ставит позицию в центр геометрии)
-                            float centerXMeters = (x + width / 2f) / PixelsPerMeter;
-                            float centerYMeters = (y + height / 2f) / PixelsPerMeter;
+                        Body windowBody = BodyFactory.CreateRectangle(
+                            _world,
+                            wMeters, hMeters,
+                            1f,
+                            new XnaVector(centerXMeters, centerYMeters)
+                        );
+                        windowBody.BodyType = BodyType.Static;
+                        windowBody.Friction = 0.4f;
+                        windowBody.Restitution = 0.2f;
 
-                            // Создаем статическое тело. Статическое тело идеально подходит, 
-                            // так как оно неподвижно в рамках одного физического шага, но его можно переносить
-                            Body windowBody = BodyFactory.CreateRectangle(
-                                _world,
-                                wMeters, hMeters,
-                                1f,
-                                new XnaVector(centerXMeters, centerYMeters)
-                            );
-                            windowBody.BodyType = BodyType.Static;
-                            windowBody.Friction = 0.4f;      // Трение для стенок окон
-                            windowBody.Restitution = 0.2f;   // Небольшой отскок при ударе об окно
-
-                            // Сохраняем ссылку на созданное тело, чтобы нарисовать его и удалить на следующем кадре
                             _windowColliders.Add(windowBody);
                         }
                     }
                     return true;
                 }, IntPtr.Zero);
-
                 // Шаг симуляции физики Velcro
                 _world.Step(Math.Min(dt, 1f / 60f));
-                //_world.Step(dt);
             }
-
             // Обновление кадров GIF-анимации
             timeCount += dt;
             while (timeCount >= frameDuration)
@@ -314,39 +278,32 @@ class Program
                 currentAnimFrame = (currentAnimFrame + 1) % framesBox;
                 timeCount -= frameDuration;
             }
-
             // --- ОТРИСОВКА ---
             Raylib.BeginDrawing();
-            Raylib.ClearBackground(Color.Blank); // Прозрачный фон
-                                                 // Включаем 2D режим камеры (все координаты далее в метрах)
+            Raylib.ClearBackground(Color.Blank);
             Raylib.BeginMode2D(_camera);
             lock (_lock)
             {
-                // 1. Визуализируем синие полупрозрачные окна прямо через их физические тела
+                // 1. Визуализируем синие полупрозрачные окна
                 foreach (var winBody in _windowColliders)
                 {
-                    // Получаем размеры и координаты обратно из физических свойств
-                    // Для отрисовки Rectangle нам нужен левый верхний угол, а не центр
                     var fixture = winBody.FixtureList[0];
                     var shape = (Genbox.VelcroPhysics.Collision.Shapes.PolygonShape)fixture.Shape;
-                    // Вычисляем ширину и высоту на основе локальных вершин формы
                     float wMeters = (shape.Vertices[1].X - shape.Vertices[0].X);
-                    float hMeters = (shape.Vertices[2].Y - shape.Vertices[1].Y);
+                    float hMeters = (shape.Vertices[1].Y - shape.Vertices[0].Y);
                     float leftMeters = winBody.Position.X - (wMeters / 2f);
                     float topMeters = winBody.Position.Y - (hMeters / 2f);
-                    // Рисуем синее окно
                     Raylib.DrawRectangleRec(
                     new Rectangle(leftMeters, topMeters, wMeters, hMeters),
-                    new Color(10, 20, 255, 60) // Полупрозрачный синий
+                    new Color(10, 20, 255, 60)
                     );
-                    // Рисуем рамку окна для четкости
                     Raylib.DrawRectangleLinesEx(
                     new Rectangle(leftMeters, topMeters, wMeters, hMeters),
-                    0.05f, // Толщина линии в метрах
+                    0.05f,
                     new Color(10, 20, 255, 150)
                     );
                 }
-                // 2. Рисуем все динамические ящики (коробки)
+                // 2. Рисуем все динамические ящики
                 foreach (var box in _boxes)
                 {
                     float rotationInDegrees = box.Rotation * (180f / (float)Math.PI);
@@ -356,12 +313,9 @@ class Program
                 }
             }
             Raylib.EndMode2D();
-
-            // Отрисовка UI текста поверх в стандартных пикселях экрана
-
+            // Отрисовка UI текста
             Raylib.DrawTextEx(myFont, "Коробки теперь сталкиваются с синими окнами Windows!", new SysVector(50 + textOffset, 100 + textOffset), 24, 2, Color.DarkGray);
             Raylib.DrawTextEx(myFont, "Коробки теперь сталкиваются с синими окнами Windows!", new SysVector(50, 100), 24, 2, Color.Purple);
-
             Color textColor = new Color(20, 20, 20, 255);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 + textOffset, 10), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 - textOffset, 10), 24, 2, textColor);
@@ -372,8 +326,6 @@ class Program
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 + textOffset, 10 - textOffset), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 - textOffset, 10 - textOffset), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10, 10), 24, 2, Color.Pink);
-
-
             Raylib.DrawFPS(10, 35);
             Raylib.EndDrawing();
         }
@@ -383,18 +335,39 @@ class Program
         Raylib.UnloadFont(myFont);
         Raylib.CloseWindow();
         _isRunning = false;
-        hook.Dispose();
-        await hookTask;
     }
-    // --- ОБРАБОТЧИКИ СОБЫТИЙ SHARPHOOK ---
-    private static void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
+    // --- ОБНОВЛЕНИЕ ПОЛОЖЕНИЯ МЫШИ И НАЖАТИЙ КЛАВИШ ЧЕРЕЗ WINAPI ---
+    private static void UpdateInput()
     {
-        if (e.Data.KeyCode == KeyCode.VcEscape)
+        // 1. Проверяем нажатие Escape для выхода
+        if ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0)
         {
             _isRunning = false;
             return;
         }
-        if (e.Data.KeyCode == KeyCode.VcC)
+        // 2. Получаем координаты курсора глобально на всем экране
+        if (GetCursorPos(out Point point))
+        {
+            _lastMouseX = _mouseX;
+            _lastMouseY = _mouseY;
+            _mouseX = point.X;
+            _mouseY = point.Y;
+            if (_mouseX != _lastMouseX || _mouseY != _lastMouseY)
+            {
+                _lastMoveTimestamp = Stopwatch.GetTimestamp();
+                if (_draggedBox != null)
+                {
+                    lock (_lock)
+                    {
+                        SysVector mouseWorldPos = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
+                        _draggedBox.Position = new XnaVector(mouseWorldPos.X, mouseWorldPos.Y);
+                    }
+                }
+            }
+        }
+        // 3. Обработка клавиши "C" (Создание коробки)
+        bool isCPressedNow = (GetAsyncKeyState(VK_C) & 0x8000) != 0;
+        if (isCPressedNow && !_wasCPressed)
         {
             lock (_lock)
             {
@@ -407,14 +380,15 @@ class Program
                 _boxes.Add(box);
             }
         }
-    }
-    private static void OnMousePressed(object? sender, MouseHookEventArgs e)
-    {
-        if (e.Data.Button == MouseButton.Button1)
+        _wasCPressed = isCPressedNow;
+        // 4. Обработка Левой Кнопки Мыши (Захват и Бросок)
+        bool isLButtonDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+        // Событие: Мышь только что нажата (Pressed)
+        if (isLButtonDown && !_wasLButtonPressed)
         {
             lock (_lock)
             {
-                SysVector mouseWorldPos = Raylib.GetScreenToWorld2D(new SysVector(e.Data.X, e.Data.Y), _camera);
+                SysVector mouseWorldPos = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
                 for (int i = _boxes.Count - 1; i >= 0; i--)
                 {
                     var box = _boxes[i];
@@ -426,68 +400,35 @@ class Program
                         _draggedBox.BodyType = BodyType.Kinematic;
                         _draggedBox.LinearVelocity = XnaVector.Zero;
                         _draggedBox.AngularVelocity = 0f;
-                        e.SuppressEvent = true;
                         break;
                     }
                 }
             }
         }
-    }
-    private static void OnMouseReleased(object? sender, MouseHookEventArgs e)
-    {
-        if (e.Data.Button == MouseButton.Button1 && _draggedBox != null)
+        // Событие: Мышь только что отпущена (Released)
+        else if (!isLButtonDown && _wasLButtonPressed && _draggedBox != null)
         {
             lock (_lock)
             {
                 float throwForceX = 0f;
                 float throwForceY = 0f;
-
-                // Проверяем, как давно мышь двигалась в последний раз
                 long currentTimestamp = Stopwatch.GetTimestamp();
                 long elapsedTicks = currentTimestamp - _lastMoveTimestamp;
                 double elapsedMilliseconds = (double)elapsedTicks / Stopwatch.Frequency * 1000;
-
-                // Если отпустили в течение 50 мс после движения — считаем бросок.
-                // Если мышь стояла дольше 50 мс — коробка просто упадет вниз.
                 if (elapsedMilliseconds < 50)
                 {
                     SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_lastMouseX, _lastMouseY), _camera);
                     SysVector currentMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
-
                     throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
                     throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
                 }
-
                 _draggedBox.BodyType = BodyType.Dynamic;
                 _draggedBox.LinearVelocity = new XnaVector(throwForceX, throwForceY);
-
-                e.SuppressEvent = true;
                 _draggedBox = null;
             }
         }
+        _wasLButtonPressed = isLButtonDown;
     }
-
-    private static void OnMouseMoved(object? sender, MouseHookEventArgs e)
-    {
-        _lastMouseX = _mouseX;
-        _lastMouseY = _mouseY;
-        _mouseX = e.Data.X;
-        _mouseY = e.Data.Y;
-
-        // Запоминаем время последнего движения (в миллисекундах)
-        _lastMoveTimestamp = Stopwatch.GetTimestamp();
-
-        if (_draggedBox != null)
-        {
-            lock (_lock)
-            {
-                SysVector mouseWorldPos = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
-                _draggedBox.Position = new XnaVector(mouseWorldPos.X, mouseWorldPos.Y);
-            }
-        }
-    }
-
-
     private static void InitializeMousePosition()
     {
         if (GetCursorPos(out Point point))
@@ -498,8 +439,4 @@ class Program
             _lastMouseY = point.Y;
         }
     }
-
-
-
-
 }
