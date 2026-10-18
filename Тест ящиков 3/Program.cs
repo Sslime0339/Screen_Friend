@@ -12,6 +12,20 @@ using System.Threading.Tasks;
 using SysVector = System.Numerics.Vector2;
 using XnaVector = Microsoft.Xna.Framework.Vector2;
 
+
+
+struct WindowData
+{
+    public float Width;
+    public float Height;
+    public float CenterX;
+    public float CenterY;
+}
+
+
+
+
+
 class Program
 {
     // --- WinAPI для работы с окнами ---
@@ -206,6 +220,78 @@ class Program
 
         InitializeMousePosition();
 
+
+
+
+
+
+        // Список для обмена данными между потоками
+        List<WindowData> pendingWindows = new List<WindowData>();
+
+        // Запускаем фоновую задачу бесконечного сканирования окон ОС
+        _ = Task.Run(async () =>
+        {
+            const int DWMWA_CLOAKED = 14;
+
+            while (_isRunning)
+            {
+                List<WindowData> currentWindows = new List<WindowData>();
+
+                EnumWindows((hWnd, lParam) =>
+                {
+                    if (!IsWindowVisible(hWnd)) return true;
+                    StringBuilder sb = new StringBuilder(256);
+                    GetWindowText(hWnd, sb, sb.Capacity);
+                    string title = sb.ToString();
+                    if (string.IsNullOrWhiteSpace(title)) return true;
+
+                    DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                    if (isCloaked) return true;
+
+                    if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+
+                    int width = rect.Right - rect.Left;
+                    int height = rect.Bottom - rect.Top;
+                    int x = rect.Left;
+                    int y = rect.Top;
+
+                    if (width <= 16 || height <= 16) return true;
+                    if (x < -10000 || y < -10000) return true;
+
+                    // Исключаем само окно оверлея
+                    if (!((width == 1600 && height == 900) || (width == 1600 && height == 860)))
+                    {
+                        if (!IsZoomed(hWnd) && !IsIconic(hWnd))
+                        {
+                            currentWindows.Add(new WindowData
+                            {
+                                Width = width / PixelsPerMeter,
+                                Height = height / PixelsPerMeter,
+                                CenterX = (x + width / 2f) / PixelsPerMeter,
+                                CenterY = (y + height / 2f) / PixelsPerMeter
+                            });
+                        }
+                    }
+                    return true;
+                }, IntPtr.Zero);
+
+                // Быстро и безопасно переносим данные в основной поток
+                lock (_lock)
+                {
+                    pendingWindows = currentWindows;
+                }
+
+                // Пауза 100 мс (хватит для плавной физики окон, разгрузит процессор на 99%)
+                await Task.Delay(100);
+            }
+        });
+
+
+
+
+
+
+
         // Основной игровой цикл
         while (_isRunning && !Raylib.WindowShouldClose())
         {
@@ -217,58 +303,28 @@ class Program
             // --- ОБНОВЛЕНИЕ ФИЗИЧЕСКИХ ОКОН WINDOWS ---
             lock (_lock)
             {
-                // 1. Удаляем старые коллайдеры окон из физического мира
+                // 1. Удаляем старые коллайдеры
                 foreach (var oldCollider in _windowColliders)
                 {
                     _world.DestroyBody(oldCollider);
                 }
                 _windowColliders.Clear();
 
-                // 2. Ищем актуальные окна ОС и строим для них новые твердые тела
-                const int DWMWA_CLOAKED = 14;
-                EnumWindows((hWnd, lParam) => {
-                if (!IsWindowVisible(hWnd)) return true;
-                StringBuilder sb = new StringBuilder(256);
-                GetWindowText(hWnd, sb, sb.Capacity);
-                string title = sb.ToString();
-                if (string.IsNullOrWhiteSpace(title)) return true;
-
-                DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
-                if (isCloaked) return true;
-
-                if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
-
-                int width = rect.Right - rect.Left;
-                int height = rect.Bottom - rect.Top;
-                int x = rect.Left;
-                int y = rect.Top;
-
-                if (width <= 16 || height <= 16) return true;
-                if (x < -10000 || y < -10000) return true;
-
-                if (!((width == 1600 && height == 900) || (width == 1600 && height == 860)))
+                // 2. Строим новые коллайдеры на основе данных из фонового потока
+                foreach (var win in pendingWindows)
                 {
-                    if (!IsZoomed(hWnd) && !IsIconic(hWnd))
-                    {
-                        float wMeters = width / PixelsPerMeter;
-                        float hMeters = height / PixelsPerMeter;
-                        float centerXMeters = (x + width / 2f) / PixelsPerMeter;
-                        float centerYMeters = (y + height / 2f) / PixelsPerMeter;
+                    Body windowBody = BodyFactory.CreateRectangle(
+                        _world,
+                        win.Width, win.Height,
+                        1f,
+                        new XnaVector(win.CenterX, win.CenterY)
+                    );
+                    windowBody.BodyType = BodyType.Static;
+                    windowBody.Friction = 0.4f;
+                    windowBody.Restitution = 0.2f;
+                    _windowColliders.Add(windowBody);
+                }
 
-                        Body windowBody = BodyFactory.CreateRectangle(
-                            _world,
-                            wMeters, hMeters,
-                            1f,
-                            new XnaVector(centerXMeters, centerYMeters)
-                        );
-                        windowBody.BodyType = BodyType.Static;
-                            windowBody.Friction = 0.4f;
-                            windowBody.Restitution = 0.2f;
-                            _windowColliders.Add(windowBody);
-                        }
-                    }
-                    return true;
-                }, IntPtr.Zero);
                 // Шаг симуляции физики Velcro
                 _world.Step(Math.Min(dt, 1f / 60f));
             }
