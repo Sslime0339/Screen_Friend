@@ -68,6 +68,7 @@ class Program
 
     private const int VK_ESCAPE = 0x1B;
     private const int VK_C = 0x43;
+    private const int VK_X = 0x58; // Код клавиши X для очистки
     private const int VK_LBUTTON = 0x01; // Левая кнопка мыши
 
     // --- Настройки физики и экрана ---
@@ -92,6 +93,7 @@ class Program
 
     // Состояния для ручной обработки нажатий (эмуляция событий Pressed/Released)
     private static bool _wasCPressed = false;
+    private static bool _wasXPressed = false; // Состояние для клавиши X
     private static bool _wasLButtonPressed = false;
 
     // Камера для конвертации координат
@@ -260,11 +262,10 @@ class Program
                             new XnaVector(centerXMeters, centerYMeters)
                         );
                         windowBody.BodyType = BodyType.Static;
-                        windowBody.Friction = 0.4f;
-                        windowBody.Restitution = 0.2f;
-
-                        _windowColliders.Add(windowBody);
-                    }
+                            windowBody.Friction = 0.4f;
+                            windowBody.Restitution = 0.2f;
+                            _windowColliders.Add(windowBody);
+                        }
                     }
                     return true;
                 }, IntPtr.Zero);
@@ -284,6 +285,7 @@ class Program
             Raylib.BeginMode2D(_camera);
             lock (_lock)
             {
+                /*
                 // 1. Визуализируем синие полупрозрачные окна
                 foreach (var winBody in _windowColliders)
                 {
@@ -302,7 +304,7 @@ class Program
                     0.05f,
                     new Color(10, 20, 255, 150)
                     );
-                }
+                }*/
                 // 2. Рисуем все динамические ящики
                 foreach (var box in _boxes)
                 {
@@ -314,10 +316,11 @@ class Program
             }
             Raylib.EndMode2D();
             // Отрисовка UI текста
-            Raylib.DrawTextEx(myFont, "Коробки теперь сталкиваются с синими окнами Windows!", new SysVector(50 + textOffset, 100 + textOffset), 24, 2, Color.DarkGray);
-            Raylib.DrawTextEx(myFont, "Коробки теперь сталкиваются с синими окнами Windows!", new SysVector(50, 100), 24, 2, Color.Purple);
-            Color textColor = new Color(20, 20, 20, 255);
-            Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 + textOffset, 10), 24, 2, textColor);
+            Color textShadowColor = new Color(20, 20, 20, 255);
+            //Raylib.DrawTextEx(myFont, "[C] - Создать коропку, [X] - Очистить всё, [ESC] - Закрыть программу", new SysVector(500 + textOffset, 10 + textOffset), 24, 2, Color.DarkGray);
+            //Raylib.DrawTextEx(myFont, "[C] - Создать коропку, [X] - Очистить всё, [ESC] - Закрыть программу", new SysVector(500, 10), 24, 2, Color.Purple);
+            DrawTextExWithShadow(myFont, "[C] - Создать коропку, [X] - Очистить всё, [ESC] - Закрыть программу", new SysVector(10, 830), 24, 2, Color.Purple, textShadowColor, textOffset);
+            /*Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 + textOffset, 10), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 - textOffset, 10), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10, 10 + textOffset), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10, 10 - textOffset), 24, 2, textColor);
@@ -325,8 +328,11 @@ class Program
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 - textOffset, 10 + textOffset), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 + textOffset, 10 - textOffset), 24, 2, textColor);
             Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10 - textOffset, 10 - textOffset), 24, 2, textColor);
-            Raylib.DrawTextEx(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10, 10), 24, 2, Color.Pink);
-            Raylib.DrawFPS(10, 35);
+            */
+            DrawTextExWithShadow(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new SysVector(10, 800), 24, 2, Color.Pink, textShadowColor, textOffset);
+            Raylib.DrawFPS(10, 770);
+
+
             Raylib.EndDrawing();
         }
         // Очистка ресурсов
@@ -336,6 +342,38 @@ class Program
         Raylib.CloseWindow();
         _isRunning = false;
     }
+
+
+    // отрисовка текста с тенью
+
+    public static void DrawTextExWithShadow(
+        Font font,
+        string text,
+        SysVector position,
+        float fontSize,
+        float spacing,
+        Color textColor,
+        Color shadowColor,
+        int offset)
+    {
+        // 1. Рисуем тень
+        //Raylib.DrawTextEx(font, text, position + offset, fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X + offset, position.Y), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X - offset, position.Y), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X, position.Y + offset), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X, position.Y - offset), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X + offset, position.Y + offset), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X - offset, position.Y + offset), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X + offset, position.Y - offset), fontSize, spacing, shadowColor);
+        Raylib.DrawTextEx(font, text, new SysVector(position.X - offset, position.Y - offset), fontSize, spacing, shadowColor);
+
+        // 2. Рисуем основной текст
+        Raylib.DrawTextEx(font, text, position, fontSize, spacing, textColor);
+    }
+
+
+
+
     // --- ОБНОВЛЕНИЕ ПОЛОЖЕНИЯ МЫШИ И НАЖАТИЙ КЛАВИШ ЧЕРЕЗ WINAPI ---
     private static void UpdateInput()
     {
@@ -409,6 +447,23 @@ class Program
             }
         }
         _wasCPressed = isCPressedNow;
+        // 3.5 Обработка клавиши "X" (Очистить все коробки)
+        bool isXPressedNow = (GetAsyncKeyState(VK_X) & 0x8000) != 0;
+        if (isXPressedNow && !_wasXPressed)
+        {
+            lock (_lock)
+            {
+                // Удаляем все коробки из физического мира Velcro
+                foreach (var box in _boxes)
+                {
+                    _world.DestroyBody(box);
+                }
+                _boxes.Clear();
+                // Если в этот момент коробка удерживалась мышью, сбрасываем захват
+                _draggedBox = null;
+            }
+        }
+        _wasXPressed = isXPressedNow;
         // 4. Обработка Левой Кнопки Мыши (Захват и Бросок)
         bool isLButtonDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
         // Событие: Мышь только что нажата (Pressed)
@@ -438,20 +493,24 @@ class Program
         {
             lock (_lock)
             {
-                float throwForceX = 0f;
-                float throwForceY = 0f;
-                long currentTimestamp = Stopwatch.GetTimestamp();
-                long elapsedTicks = currentTimestamp - _lastMoveTimestamp;
-                double elapsedMilliseconds = (double)elapsedTicks / Stopwatch.Frequency * 1000;
-                if (elapsedMilliseconds < 50)
+                // Проверяем существование объекта, так как его могли удалить клавишей X во время удержания
+                if (_boxes.Contains(_draggedBox))
                 {
-                    SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_lastMouseX, _lastMouseY), _camera);
-                    SysVector currentMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
-                    throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
-                    throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
+                    float throwForceX = 0f;
+                    float throwForceY = 0f;
+                    long currentTimestamp = Stopwatch.GetTimestamp();
+                    long elapsedTicks = currentTimestamp - _lastMoveTimestamp;
+                    double elapsedMilliseconds = (double)elapsedTicks / Stopwatch.Frequency * 1000;
+                    if (elapsedMilliseconds < 50)
+                    {
+                        SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_lastMouseX, _lastMouseY), _camera);
+                        SysVector currentMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
+                        throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
+                        throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
+                    }
+                    _draggedBox.BodyType = BodyType.Dynamic;
+                    _draggedBox.LinearVelocity = new XnaVector(throwForceX, throwForceY);
                 }
-                _draggedBox.BodyType = BodyType.Dynamic;
-                _draggedBox.LinearVelocity = new XnaVector(throwForceX, throwForceY);
                 _draggedBox = null;
             }
         }
