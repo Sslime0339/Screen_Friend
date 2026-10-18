@@ -12,7 +12,6 @@
   <ItemGroup>
     <PackageReference Include="Genbox.VelcroPhysics" Version="0.1.0-alpha.2" />
     <PackageReference Include="Raylib-cs" Version="8.1.0" />
-    <PackageReference Include="SharpHook" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

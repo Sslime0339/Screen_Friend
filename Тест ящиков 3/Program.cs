@@ -209,7 +209,7 @@ class Program
         {
             float dt = Raylib.GetFrameTime();
 
-            // --- ОБРАБОТКА ГЛОБАЛЬНОГО ВВОДА (ВЗАМЕН SHARPHOOK) ---
+            // --- ОБРАБОТКА ГЛОБАЛЬНОГО ВВОДА ---
             UpdateInput();
 
             // --- ОБНОВЛЕНИЕ ФИЗИЧЕСКИХ ОКОН WINDOWS ---
@@ -263,8 +263,8 @@ class Program
                         windowBody.Friction = 0.4f;
                         windowBody.Restitution = 0.2f;
 
-                            _windowColliders.Add(windowBody);
-                        }
+                        _windowColliders.Add(windowBody);
+                    }
                     }
                     return true;
                 }, IntPtr.Zero);
@@ -352,6 +352,34 @@ class Program
             _lastMouseY = _mouseY;
             _mouseX = point.X;
             _mouseY = point.Y;
+            // --- НОВАЯ ЛОГИКА ДИНАМИЧЕСКОГО КЛИКА НА СКВОЗЬ ---
+            bool isHoveringBox = false;
+            lock (_lock)
+            {
+                SysVector mouseWorldPos = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
+                for (int i = _boxes.Count - 1; i >= 0; i--)
+                {
+                    var box = _boxes[i];
+                    float halfSize = BoxSizeMeters / 2f;
+                    if (mouseWorldPos.X >= box.Position.X - halfSize && mouseWorldPos.X <= box.Position.X + halfSize &&
+                    mouseWorldPos.Y >= box.Position.Y - halfSize && mouseWorldPos.Y <= box.Position.Y + halfSize)
+                    {
+                        isHoveringBox = true;
+                        break;
+                    }
+                }
+            }
+            // Если мы навели на коробку или уже тащим её — окно должно принимать клики.
+            // Если курсор на пустом месте — включаем флаг Passthrough, чтобы клик пролетал дальше в Windows.
+            if (isHoveringBox || _draggedBox != null)
+            {
+                Raylib.ClearWindowState(ConfigFlags.MousePassthroughWindow);
+            }
+            else
+            {
+                Raylib.SetWindowState(ConfigFlags.MousePassthroughWindow);
+            }
+            // --------------------------------------------------
             if (_mouseX != _lastMouseX || _mouseY != _lastMouseY)
             {
                 _lastMoveTimestamp = Stopwatch.GetTimestamp();
