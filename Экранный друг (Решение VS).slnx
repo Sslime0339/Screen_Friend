@@ -4,4 +4,6 @@
   <Project Path="Тест SharpHook/Тест SharpHook.csproj" Id="bd99c7b7-624a-4c40-aa36-012a1bf9c410" />
   <Project Path="Тест получение всех окон/Тест получение всех окон.csproj" Id="2897e28e-3112-4b1f-a146-a036f28bfeef" />
   <Project Path="Тест с ящиками 2/Тест с ящиками 2.csproj" Id="9e0b8f1f-0376-4505-959f-23a88030fb9b" />
+  <Project Path="Тест физики Velcro Physics/Тест физики Velcro Physics.csproj" Id="c3ff8a29-4505-47e6-a370-01575da60687" />
+  <Project Path="Тест ящиков 3/Тест ящиков 3.csproj" Id="f8a62aae-448c-4816-8223-efd5f0c9b231" />
 </Solution>
