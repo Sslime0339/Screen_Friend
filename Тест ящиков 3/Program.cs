@@ -5,6 +5,7 @@ using SharpHook;
 using SharpHook.Data;
 //using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -58,6 +59,20 @@ class Program
         public int Bottom;
     }
 
+
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out Point lpPoint);
+
+    private struct Point { public int X; public int Y; }
+
+
+
+
+
+
+
     // --- Настройки физики и экрана ---
     const float PixelsPerMeter = 50f; // 50 пикселей = 1 метр
     private const float BoxSizeMeters = 1.2f; // Размер ящика в метрах (1.2м * 50пкс = 60 пикселей)
@@ -106,7 +121,7 @@ class Program
 
         // --- СОЗДАНИЕ ГРАНИЦ ЭКРАНА (СТЕНЫ И ПОЛ) ---
         float viewWidthMeters = screenWidth / PixelsPerMeter;
-        float viewHeightMeters = screenHeight / PixelsPerMeter * 5;
+        float viewHeightMeters = screenHeight / PixelsPerMeter * 8;
         float wallThickness = 5.0f; // Толщина стен (в метрах), чтобы коробки не пролетали сквозь них на огромной скорости
 
         float groundHeightMeters = 5f;
@@ -201,6 +216,13 @@ class Program
         float timeCount = 0.0f;
         float frameDuration = 0.02f;
 
+
+
+
+
+
+        InitializeMousePosition();
+
         // 6. Запуск SharpHook глобального перехвата
         using var hook = new SimpleGlobalHook();
         hook.KeyPressed += OnKeyPressed;
@@ -281,7 +303,8 @@ class Program
                 }, IntPtr.Zero);
 
                 // Шаг симуляции физики Velcro
-                _world.Step(Math.Min(dt, 1f / 30f));
+                _world.Step(Math.Min(dt, 1f / 60f));
+                //_world.Step(dt);
             }
 
             // Обновление кадров GIF-анимации
@@ -416,23 +439,44 @@ class Program
         {
             lock (_lock)
             {
-                SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_lastMouseX, _lastMouseY), _camera);
-                SysVector currentMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
-                float throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
-                float throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
+                float throwForceX = 0f;
+                float throwForceY = 0f;
+
+                // Проверяем, как давно мышь двигалась в последний раз
+                long currentTimestamp = Stopwatch.GetTimestamp();
+                long elapsedTicks = currentTimestamp - _lastMoveTimestamp;
+                double elapsedMilliseconds = (double)elapsedTicks / Stopwatch.Frequency * 1000;
+
+                // Если отпустили в течение 50 мс после движения — считаем бросок.
+                // Если мышь стояла дольше 50 мс — коробка просто упадет вниз.
+                if (elapsedMilliseconds < 50)
+                {
+                    SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_lastMouseX, _lastMouseY), _camera);
+                    SysVector currentMouseWorld = Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _camera);
+
+                    throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
+                    throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
+                }
+
                 _draggedBox.BodyType = BodyType.Dynamic;
                 _draggedBox.LinearVelocity = new XnaVector(throwForceX, throwForceY);
+
                 e.SuppressEvent = true;
                 _draggedBox = null;
             }
         }
     }
+
     private static void OnMouseMoved(object? sender, MouseHookEventArgs e)
     {
         _lastMouseX = _mouseX;
         _lastMouseY = _mouseY;
         _mouseX = e.Data.X;
         _mouseY = e.Data.Y;
+
+        // Запоминаем время последнего движения (в миллисекундах)
+        _lastMoveTimestamp = Stopwatch.GetTimestamp();
+
         if (_draggedBox != null)
         {
             lock (_lock)
@@ -442,4 +486,20 @@ class Program
             }
         }
     }
+
+
+    private static void InitializeMousePosition()
+    {
+        if (GetCursorPos(out Point point))
+        {
+            _mouseX = point.X;
+            _mouseY = point.Y;
+            _lastMouseX = point.X;
+            _lastMouseY = point.Y;
+        }
+    }
+
+
+
+
 }
