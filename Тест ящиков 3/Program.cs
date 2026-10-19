@@ -80,6 +80,25 @@ class Program
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+
+
+
+
+
+    // Подключаем функцию из системной библиотеки Windows (User32.dll)
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+
+
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(int uiAction, int uiParam, ref RECT pvParam, int fWinIni);
+
+
+
+
+
     private const int VK_ESCAPE = 0x1B;
     private const int VK_C = 0x43;
     private const int VK_X = 0x58; // Код клавиши X для очистки
@@ -123,22 +142,50 @@ class Program
             ConfigFlags.TopmostWindow
         );
 
-        const int screenWidth = 1600;
-        const int screenHeight = 860;
-        Raylib.InitWindow(screenWidth, screenHeight, "Raylib-cs + Velcro Physics overlay");
+        //int screenWidth = Raylib.GetMonitorWidth(Raylib.GetCurrentMonitor());
+        //int screenHeight = Raylib.GetMonitorHeight(Raylib.GetCurrentMonitor()) - 40;
+
+
+        const int SPI_GETWORKAREA = 48; // Код для получения рабочей области
+
+        RECT workArea = new RECT();
+        SystemParametersInfo(SPI_GETWORKAREA, 0, ref workArea, 0);
+
+        // Вычисляем чистую высоту (Нижняя граница минус Верхняя граница)
+        int workAreaHeight = workArea.Bottom - workArea.Top;
+        int workAreaWidth = workArea.Right - workArea.Left;
+
+        Console.WriteLine(workAreaHeight);
+        Console.WriteLine(workAreaWidth);
+
+
+        // Константы для ширины и высоты главного экрана
+        const int SM_CXSCREEN = 0;
+        const int SM_CYSCREEN = 1;
+        // 1. Получаем размеры экрана ДО ИНИЦИАЛИЗАЦИИ Raylib
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+
+        //Console.WriteLine(Raylib.GetCurrentMonitor());
+
+        //Console.WriteLine(screenWidth);
+        //Console.WriteLine(screenHeight);
+
+        Raylib.InitWindow(workAreaWidth, workAreaHeight, "Raylib-cs + Velcro Physics overlay");
         Raylib.SetTargetFPS(60);
 
         // 2. Инициализация физического мира Velcro (Гравитация вниз)
         _world = new World(new XnaVector(0f, 19.6f));
 
         // --- СОЗДАНИЕ ГРАНИЦ ЭКРАНА (СТЕНЫ И ПОЛ) ---
-        float viewWidthMeters = screenWidth / PixelsPerMeter;
-        float viewHeightMeters = screenHeight / PixelsPerMeter;
+        float viewWidthMeters = workAreaWidth / PixelsPerMeter;
+        float viewHeightMeters = workAreaHeight / PixelsPerMeter;
         float wallThickness = 5.0f;
 
         float groundHeightMeters = 5f;
-        float groundYMeters = screenHeight / PixelsPerMeter + (groundHeightMeters / 2f);
-        float groundWidthMeters = screenWidth / PixelsPerMeter;
+        float groundYMeters = workAreaHeight / PixelsPerMeter + (groundHeightMeters / 2f);
+        float groundWidthMeters = workAreaWidth / PixelsPerMeter;
 
         // Нижний пол
         Body ground = BodyFactory.CreateRectangle(
@@ -223,8 +270,6 @@ class Program
 
 
 
-
-
         // Список для обмена данными между потоками
         List<WindowData> pendingWindows = new List<WindowData>();
 
@@ -259,7 +304,7 @@ class Program
                     if (x < -10000 || y < -10000) return true;
 
                     // Исключаем само окно оверлея
-                    if (!((width == 1600 && height == 900) || (width == 1600 && height == 860)))
+                    if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
                     {
                         if (!IsZoomed(hWnd) && !IsIconic(hWnd))
                         {
@@ -295,7 +340,9 @@ class Program
         // Основной игровой цикл
         while (_isRunning && !Raylib.WindowShouldClose())
         {
+            
             float dt = Raylib.GetFrameTime();
+
 
             // --- ОБРАБОТКА ГЛОБАЛЬНОГО ВВОДА ---
             UpdateInput();
@@ -341,26 +388,26 @@ class Program
             Raylib.BeginMode2D(_camera);
             lock (_lock)
             {
-                /*
-                // 1. Визуализируем синие полупрозрачные окна
-                foreach (var winBody in _windowColliders)
+                
+#if DEBUG
+                // 2. Отрисовка в основном/графическом потоке
+                foreach (var win in pendingWindows)
                 {
-                    var fixture = winBody.FixtureList[0];
-                    var shape = (Genbox.VelcroPhysics.Collision.Shapes.PolygonShape)fixture.Shape;
-                    float wMeters = (shape.Vertices[1].X - shape.Vertices[0].X);
-                    float hMeters = (shape.Vertices[1].Y - shape.Vertices[0].Y);
-                    float leftMeters = winBody.Position.X - (wMeters / 2f);
-                    float topMeters = winBody.Position.Y - (hMeters / 2f);
-                    Raylib.DrawRectangleRec(
-                    new Rectangle(leftMeters, topMeters, wMeters, hMeters),
-                    new Color(10, 20, 255, 60)
-                    );
-                    Raylib.DrawRectangleLinesEx(
-                    new Rectangle(leftMeters, topMeters, wMeters, hMeters),
-                    0.05f,
-                    new Color(10, 20, 255, 150)
-                    );
-                }*/
+                    // Вычисляем верхний левый угол на основе центра и размеров
+                    float leftMeters = win.CenterX - (win.Width / 2f);
+                    float topMeters = win.CenterY - (win.Height / 2f);
+
+                    var rect = new Rectangle(leftMeters, topMeters, win.Width, win.Height);
+
+                    // Рисуем полупрозрачное окно
+                    Raylib.DrawRectangleRec(rect, new Color(10, 20, 255, 60));
+
+                    // Рисуем контур окна
+                    Raylib.DrawRectangleLinesEx(rect, 0.05f, new Color(10, 20, 255, 150));
+                }
+
+#endif
+                
                 // 2. Рисуем все динамические ящики
                 foreach (var box in _boxes)
                 {
