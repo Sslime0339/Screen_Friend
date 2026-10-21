@@ -36,7 +36,7 @@ internal sealed class PhysicsWorldService : IDisposable
         _world.Gravity = new Vector2(0f, gravityY);
     }
 
-    public void SpawnBox(float x, float y)
+    public Body SpawnBox(float x, float y)
     {
         var body = BodyFactory.CreateRectangle(
             _world, BoxSizeMeters, BoxSizeMeters, 2f, new Vector2(x, y));
@@ -44,6 +44,7 @@ internal sealed class PhysicsWorldService : IDisposable
         body.Restitution = 0.2f;
         body.Friction = 0.6f;
         _boxes.Add(body);
+        return body;
     }
 
     public void ClearBoxes()

@@ -54,7 +54,7 @@ internal sealed class RaylibRenderer : IDisposable
         };
     }
 
-    public void DrawFrame(PhysicsWorldService physics, InputController input, float dt)
+    public void DrawFrame(PhysicsWorldService physics, Scene scene, InputController input, float dt)
     {
         _frameTime += dt;
         while (_frameTime >= FrameDuration)
@@ -74,13 +74,14 @@ internal sealed class RaylibRenderer : IDisposable
         }
 #endif
 
-        foreach (Body box in physics.Boxes)
+        foreach (GameObject gameObject in scene.Objects)
         {
+            Body box = gameObject.Body;
             float rotation = box.Rotation * (180f / (float)Math.PI);
             Rectangle destination = new(
                 box.Position.X, box.Position.Y,
-                physics.BoxSize, physics.BoxSize);
-            SysVector origin = new(physics.BoxSize / 2f, physics.BoxSize / 2f);
+                gameObject.Width, gameObject.Height);
+            SysVector origin = new(gameObject.Width / 2f, gameObject.Height / 2f);
             Raylib.DrawTexturePro(
                 _boxFrames[_currentFrame], _sourceRect, destination,
                 origin, rotation, Color.White);
@@ -90,7 +91,7 @@ internal sealed class RaylibRenderer : IDisposable
 
         var shadow = new Color(20, 20, 20, 255);
         DrawTextWithShadow(
-            $"Окон-препятствий: {physics.WindowColliders.Count} | Коробок: {physics.Boxes.Count}",
+            $"Окон-препятствий: {physics.WindowColliders.Count} | Объектов сцены: {scene.Objects.Count}",
             new SysVector(10, 800), 24, 2, Color.Pink, shadow, TextOffset);
         DrawTextWithShadow(
             "[C] - Создать коробку, [X] - Очистить всё, [ESC] - Закрыть программу",

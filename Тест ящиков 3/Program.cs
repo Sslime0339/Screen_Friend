@@ -29,7 +29,9 @@ internal static class Program
 
         var physics = new PhysicsWorldService(workWidth, workHeight, PixelsPerMeter);
         var renderer = new RaylibRenderer();
-        var input = new InputController(physics, PixelsPerMeter);
+        var factory = new GameObjectFactory(physics);
+        var scene = new Scene(factory, physics);
+        var input = new InputController(physics, scene, PixelsPerMeter);
 
         using var cancellation = new CancellationTokenSource();
         Task windowScanTask = windows.RunScannerAsync(cancellation.Token);
@@ -44,7 +46,8 @@ internal static class Program
                 physics.SetWindowObstacles(windows.GetLatestSnapshot());
                 physics.Step(Math.Min(dt, 1f / 60f));
 
-                renderer.DrawFrame(physics, input, dt);
+                scene.RemoveObjectsWithoutBodies();
+                renderer.DrawFrame(physics, scene, input, dt);
             }
         }
         finally

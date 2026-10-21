@@ -23,15 +23,17 @@ internal sealed class InputController
     private static extern bool GetCursorPos(out NativePoint point);
 
     private readonly PhysicsWorldService _physics;
+    private readonly Scene _scene;
     private readonly float _pixelsPerMeter;
     private int _mouseX, _mouseY, _lastMouseX, _lastMouseY;
     private long _lastMoveTimestamp;
     private Body? _draggedBox;
     private bool _wasCPressed, _wasXPressed, _wasLButtonPressed;
 
-    public InputController(PhysicsWorldService physics, float pixelsPerMeter)
+    public InputController(PhysicsWorldService physics, Scene scene, float pixelsPerMeter)
     {
         _physics = physics;
+        _scene = scene;
         _pixelsPerMeter = pixelsPerMeter;
         InitializeMousePosition();
     }
@@ -69,13 +71,13 @@ internal sealed class InputController
 
         bool cPressed = (GetAsyncKeyState(VK_C) & 0x8000) != 0;
         if (cPressed && !_wasCPressed)
-            _physics.SpawnBox(_mouseX / _pixelsPerMeter, _mouseY / _pixelsPerMeter);
+            _scene.CreateBox(_mouseX / _pixelsPerMeter, _mouseY / _pixelsPerMeter);
         _wasCPressed = cPressed;
 
         bool xPressed = (GetAsyncKeyState(VK_X) & 0x8000) != 0;
         if (xPressed && !_wasXPressed)
         {
-            _physics.ClearBoxes();
+            _scene.Clear();
             _draggedBox = null;
         }
         _wasXPressed = xPressed;
