@@ -97,6 +97,18 @@ class Program
 
 
 
+    // --- Дополнительное WinAPI для разворачивания ---
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SW_RESTORE = 9; // Константа для восстановления окна из свернутого состояния
+
+
+
+
+
+
+
 
 
     private const int VK_ESCAPE = 0x1B;
@@ -332,6 +344,30 @@ class Program
         });
 
 
+        IntPtr windowHandle;
+        // Получаем системный Handle нашего окна Raylib
+        unsafe
+        {
+            windowHandle = (IntPtr)Raylib.GetWindowHandle();
+        }
+
+
+        // Фоновая задача на чистом WinAPI, работающая в обход замороженного потока Raylib
+        _ = Task.Run(async () =>
+        {
+            while (_isRunning)
+            {
+                // Проверяем, свернуто ли наше окно оверлея
+                if (IsIconic(windowHandle)) // Функция IsIconic уже есть в вашем коде!
+                {
+                    // Принудительно восстанавливаем окно силами Windows
+                    ShowWindow(windowHandle, SW_RESTORE);
+                }
+
+                await Task.Delay(50); // Проверка каждые 50мс
+            }
+        });
+
 
 
 
@@ -340,7 +376,10 @@ class Program
         // Основной игровой цикл
         while (_isRunning && !Raylib.WindowShouldClose())
         {
-            
+
+
+
+
             float dt = Raylib.GetFrameTime();
 
 
@@ -388,7 +427,7 @@ class Program
             Raylib.BeginMode2D(_camera);
             lock (_lock)
             {
-                
+
 #if DEBUG
                 // 2. Отрисовка в основном/графическом потоке
                 foreach (var win in pendingWindows)
@@ -407,7 +446,7 @@ class Program
                 }
 
 #endif
-                
+
                 // 2. Рисуем все динамические ящики
                 foreach (var box in _boxes)
                 {
