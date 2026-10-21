@@ -99,6 +99,21 @@ class Program
     [DllImport("user32.dll")]
     private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
 
+
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_SHOWWINDOW = 0x0040;
+    private const int LWA_ALPHA = 0x00000002;
+
+
+
+
+
+
+
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_LAYERED = 0x00080000;
     private const int WS_EX_TRANSPARENT = 0x00000020; // Клик насквозь
@@ -221,46 +236,46 @@ class Program
         // Поток сканирования окон
         _ = Task.Run(async () =>
         {
-        const int DWMWA_CLOAKED = 14;
-        while (_isRunning)
-        {
-            List<WindowData> currentWindows = new List<WindowData>();
-            EnumWindows((hWnd, lParam) =>
+            const int DWMWA_CLOAKED = 14;
+            while (_isRunning)
             {
-            if (!IsWindowVisible(hWnd)) return true;
-            StringBuilder sb = new StringBuilder(256);
-            GetWindowText(hWnd, sb, sb.Capacity);
-            string title = sb.ToString();
-            if (string.IsNullOrWhiteSpace(title)) return true;
-
-            DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
-            if (isCloaked) return true;
-
-            if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
-
-            int width = rect.Right - rect.Left;
-            int height = rect.Bottom - rect.Top;
-            int x = rect.Left;
-            int y = rect.Top;
-
-            if (width <= 16 || height <= 16) return true;
-            if (x < -10000 || y < -10000) return true;
-
-            if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
-            {
-                if (!IsZoomed(hWnd) && !IsIconic(hWnd))
+                List<WindowData> currentWindows = new List<WindowData>();
+                EnumWindows((hWnd, lParam) =>
                 {
-                    currentWindows.Add(new WindowData
+                    if (!IsWindowVisible(hWnd)) return true;
+                    StringBuilder sb = new StringBuilder(256);
+                    GetWindowText(hWnd, sb, sb.Capacity);
+                    string title = sb.ToString();
+                    if (string.IsNullOrWhiteSpace(title)) return true;
+
+                    DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                    if (isCloaked) return true;
+
+                    if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+
+                    int width = rect.Right - rect.Left;
+                    int height = rect.Bottom - rect.Top;
+                    int x = rect.Left;
+                    int y = rect.Top;
+
+                    if (width <= 16 || height <= 16) return true;
+                    if (x < -10000 || y < -10000) return true;
+
+                    if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
                     {
-                        Width = width / PixelsPerMeter,
-                        Height = height / PixelsPerMeter,
-                        CenterX = (x + width / 2f) / PixelsPerMeter,
-                        CenterY = (y + height / 2f) / PixelsPerMeter
-                    });
+                        if (!IsZoomed(hWnd) && !IsIconic(hWnd))
+                        {
+                            currentWindows.Add(new WindowData
+                            {
+                                Width = width / PixelsPerMeter,
+                                Height = height / PixelsPerMeter,
+                                CenterX = (x + width / 2f) / PixelsPerMeter,
+                                CenterY = (y + height / 2f) / PixelsPerMeter
+                            });
+                        }
                     }
-                }
-                return true;
-            }, IntPtr.Zero);
+                    return true;
+                }, IntPtr.Zero);
                 lock (_lock)
                 {
                     pendingWindows = currentWindows;
@@ -269,88 +284,245 @@ class Program
             }
         });
         Clock deltaClock = new Clock();
-        // Главный цикл SFML
-        while (_isRunning && _window.IsOpen)
+
+        static async Task Main(string[] args)
         {
-            _window.DispatchEvents();
-            if (IsIconic(windowHandle))
+            const int SPI_GETWORKAREA = 48;
+            RECT workArea = new RECT();
+            SystemParametersInfo(SPI_GETWORKAREA, 0, ref workArea, 0);
+
+            int workAreaHeight = workArea.Bottom - workArea.Top;
+            int workAreaWidth = workArea.Right - workArea.Left;
+
+            const int SM_CXSCREEN = 0;
+            const int SM_CYSCREEN = 1;
+            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+            // 1. Создаем окно SFML строго БЕЗ рамки
+            VideoMode mode = new VideoMode(new Vector2u((uint)workAreaWidth, (uint)workAreaHeight));
+            _window = new RenderWindow(mode, "SFML Velcro Physics Overlay", Styles.None, State.Windowed);
+            _window.SetFramerateLimit(60);
+
+            // 2. Получаем системный дескриптор окна SFML
+            IntPtr windowHandle = _window.CPointer;
+
+            // 3. Исправляем СМЕЩЕНИЕ: Принудительно ставим окно в координаты (0, workArea.Top) и задаем точные размеры
+            SetWindowPos(windowHandle, HWND_TOPMOST, workArea.Left, workArea.Top, workAreaWidth, workAreaHeight, SWP_SHOWWINDOW);
+
+            // 4. Убираем любые стили рамки на уровне ОС Windows
+            const int GWL_STYLE = -16;
+            const uint WS_POPUP = 0x80000000;
+            const uint WS_VISIBLE = 0x10000000;
+            SetWindowLong(windowHandle, GWL_STYLE, unchecked((int)(WS_POPUP | WS_VISIBLE)));
+
+            // 5. Делаем окно многослойным (Layered), поверх всех (Topmost) и убираем из Alt+Tab
+            int initialExStyle = GetWindowLong(windowHandle, GWL_EXSTYLE);
+            int targetStyle = initialExStyle | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
+            SetWindowLong(windowHandle, GWL_EXSTYLE, targetStyle);
+
+            // 6. ВКЛЮЧАЕМ ПРОЗРАЧНОСТЬ: Говорим Windows, что чистый черный цвет (0, 0, 0) — это 100% прозрачность (невидим)
+            // Это заставит рабочий стол просвечивать сквозь черный фон SFML
+            SetLayeredWindowAttributes(windowHandle, 0x00000000, 255, LWA_COLORKEY | LWA_ALPHA);
+
+            // Физический мир Velcro
+            _world = new World(new XnaVector(0f, 19.6f));
+
+            float viewWidthMeters = workAreaWidth / PixelsPerMeter;
+            float viewHeightMeters = workAreaHeight / PixelsPerMeter;
+            float wallThickness = 5.0f;
+
+            float groundHeightMeters = 5f;
+            float groundYMeters = workAreaHeight / PixelsPerMeter + (groundHeightMeters / 2f);
+            float groundWidthMeters = workAreaWidth / PixelsPerMeter;
+
+            // Пол
+            Body ground = BodyFactory.CreateRectangle(_world, groundWidthMeters * 1.2f, groundHeightMeters, 1f, new XnaVector(groundWidthMeters / 2f, groundYMeters));
+            ground.BodyType = BodyType.Static;
+            ground.Friction = 0.6f;
+
+            // Левая стена
+            Body leftWall = BodyFactory.CreateRectangle(_world, wallThickness, viewHeightMeters * 8, 1f, new XnaVector(-(wallThickness / 2f), viewHeightMeters / 2f));
+            leftWall.BodyType = BodyType.Static;
+            leftWall.Friction = 0.4f;
+            leftWall.Restitution = 0.3f;
+
+            // Правая стена
+            Body rightWall = BodyFactory.CreateRectangle(_world, wallThickness, viewHeightMeters * 8, 1f, new XnaVector(viewWidthMeters + (wallThickness / 2f), viewHeightMeters / 2f));
+            rightWall.BodyType = BodyType.Static;
+            rightWall.Friction = 0.4f;
+            rightWall.Restitution = 0.3f;
+
+            // Камера для физики
+            _physicsView = new View(new Vector2f(viewWidthMeters / 2f, viewHeightMeters / 2f), new Vector2f(viewWidthMeters, viewHeightMeters));
+
+            // Шрифты и текстуры
+            SfFont myFont = new SfFont("Arial.ttf");
+            int framesBox = 1;
+            Texture[] texBoxAnim = new Texture[framesBox];
+            for (int i = 0; i < framesBox; i++)
             {
-                ShowWindow(windowHandle, SW_RESTORE);
+                SfImage img = new SfImage(new Vector2u(60, 60), SfColor.Cyan);
+                texBoxAnim[i] = new Texture(img);
             }
-            float dt = deltaClock.Restart().AsSeconds();
-            // Обработка ввода
-            UpdateInput(windowHandle);
-            // Физика окон Windows
-            lock (_lock)
+
+            int currentAnimFrame = 0;
+            float frameDuration = 0.02f;
+            float timeCount = 0.0f;
+
+            InitializeMousePosition();
+
+            List<WindowData> pendingWindows = new List<WindowData>();
+
+            // Поток сканирования окон
+            _ = Task.Run(async () =>
             {
-                foreach (var oldCollider in _windowColliders)
+                const int DWMWA_CLOAKED = 14;
+                while (_isRunning)
                 {
-                    _world.DestroyBody(oldCollider);
+                    List<WindowData> currentWindows = new List<WindowData>();
+                    EnumWindows((hWnd, lParam) =>
+                    {
+                        if (!IsWindowVisible(hWnd)) return true;
+                        StringBuilder sb = new StringBuilder(256);
+                        GetWindowText(hWnd, sb, sb.Capacity);
+                        string title = sb.ToString();
+                        if (string.IsNullOrWhiteSpace(title)) return true;
+
+                        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                        if (isCloaked) return true;
+
+                        if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+
+                        int width = rect.Right - rect.Left;
+                        int height = rect.Bottom - rect.Top;
+                        int x = rect.Left;
+                        int y = rect.Top;
+
+                        if (width <= 16 || height <= 16) return true;
+                        if (x < -10000 || y < -10000) return true;
+
+                        if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
+                        {
+                            if (!IsZoomed(hWnd) && !IsIconic(hWnd))
+                            {
+                                currentWindows.Add(new WindowData
+                                {
+                                    Width = width / PixelsPerMeter,
+                                    Height = height / PixelsPerMeter,
+                                    CenterX = (x + width / 2f) / PixelsPerMeter,
+                                    CenterY = (y + height / 2f) / PixelsPerMeter
+                                });
+                            }
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+
+                    lock (_lock)
+                    {
+                        pendingWindows = currentWindows;
+                    }
+                    await Task.Delay(100);
                 }
-                _windowColliders.Clear();
-                foreach (var win in pendingWindows)
+            });
+
+            Clock deltaClock = new Clock();
+
+            // Главный цикл SFML
+            while (_isRunning && _window.IsOpen)
+            {
+                _window.DispatchEvents();
+
+                if (IsIconic(windowHandle))
                 {
-                    Body windowBody = BodyFactory.CreateRectangle(_world, win.Width, win.Height, 1f, new XnaVector(win.CenterX, win.CenterY));
-                    windowBody.BodyType = BodyType.Static;
-                    windowBody.Friction = 0.4f;
-                    windowBody.Restitution = 0.2f;
-                    _windowColliders.Add(windowBody);
+                    ShowWindow(windowHandle, SW_RESTORE);
                 }
-                _world.Step(Math.Min(dt, 1f / 60f));
-            }
-            // Анимация ящиков
-            timeCount += dt;
-            while (timeCount >= frameDuration)
-            {
-                currentAnimFrame = (currentAnimFrame + 1) % framesBox;
-                timeCount -= frameDuration;
-            }
-            // --- ОТРИСОВКА ---
-            _window.Clear(SfColor.Black);
-            // Рисуем физические объекты (переключаем View на метры)
-            _window.SetView(_physicsView);
-            lock (_lock)
-            {
+
+                float dt = deltaClock.Restart().AsSeconds();
+
+                UpdateInput(windowHandle);
+
+                lock (_lock)
+                {
+                    foreach (var oldCollider in _windowColliders)
+                    {
+                        _world.DestroyBody(oldCollider);
+                    }
+                    _windowColliders.Clear();
+
+                    foreach (var win in pendingWindows)
+                    {
+                        Body windowBody = BodyFactory.CreateRectangle(_world, win.Width, win.Height, 1f, new XnaVector(win.CenterX, win.CenterY));
+                        windowBody.BodyType = BodyType.Static;
+                        windowBody.Friction = 0.4f;
+                        windowBody.Restitution = 0.2f;
+                        _windowColliders.Add(windowBody);
+                    }
+
+                    _world.Step(Math.Min(dt, 1f / 60f));
+                }
+
+                timeCount += dt;
+                while (timeCount >= frameDuration)
+                {
+                    currentAnimFrame = (currentAnimFrame + 1) % framesBox;
+                    timeCount -= frameDuration;
+                }
+
+                // --- ВАЖНО: Очищаем строго в чистый черный цвет ---
+                // Из-за флага LWA_COLORKEY этот цвет станет прозрачным «стеклом» оверлея
+                _window.Clear(new SfColor(0, 0, 0, 255));
+
+                _window.SetView(_physicsView);
+                lock (_lock)
+                {
 #if DEBUG
-                // В режиме отладки рисуем коллайдеры окон Windows
-                foreach (var win in pendingWindows)
-                {
-                    RectangleShape rectShape = new RectangleShape(new Vector2f(win.Width, win.Height));
-                    rectShape.Origin = new Vector2f(win.Width / 2f, win.Height / 2f);
-                    rectShape.Position = new Vector2f(win.CenterX, win.CenterY);
-                    rectShape.FillColor = new SfColor(10, 20, 255, 60);
-                    rectShape.OutlineColor = new SfColor(10, 20, 255, 150);
-                    rectShape.OutlineThickness = 0.05f;
-                    _window.Draw(rectShape);
-                }
+                    foreach (var win in pendingWindows)
+                    {
+                        RectangleShape rectShape = new RectangleShape(new Vector2f(win.Width, win.Height));
+                        rectShape.Origin = new Vector2f(win.Width / 2f, win.Height / 2f);
+                        rectShape.Position = new Vector2f(win.CenterX, win.CenterY);
+                        rectShape.FillColor = new SfColor(10, 20, 255, 60);
+                        rectShape.OutlineColor = new SfColor(10, 20, 255, 150);
+                        rectShape.OutlineThickness = 0.05f;
+                        _window.Draw(rectShape);
+                    }
 #endif
-                // Рисуем динамические коробки
-                Sprite boxSprite = new Sprite(texBoxAnim[currentAnimFrame]);
-                boxSprite.Origin = new Vector2f(texBoxAnim[currentAnimFrame].Size.X / 2f, texBoxAnim[currentAnimFrame].Size.Y / 2f);
-                float scaleX = BoxSizeMeters * PixelsPerMeter / texBoxAnim[currentAnimFrame].Size.X;
-                float scaleY = BoxSizeMeters * PixelsPerMeter / texBoxAnim[currentAnimFrame].Size.Y;
-                boxSprite.Scale = new Vector2f(scaleX / PixelsPerMeter, scaleY / PixelsPerMeter);
-                foreach (var box in _boxes)
-                {
-                    boxSprite.Position = new Vector2f(box.Position.X, box.Position.Y);
-                    boxSprite.Rotation = box.Rotation * (180f / (float)Math.PI);
-                    _window.Draw(boxSprite);
+
+                    Sprite boxSprite = new Sprite(texBoxAnim[currentAnimFrame]);
+                    boxSprite.Origin = new Vector2f(texBoxAnim[currentAnimFrame].Size.X / 2f, texBoxAnim[currentAnimFrame].Size.Y / 2f);
+
+                    float scaleX = BoxSizeMeters * PixelsPerMeter / texBoxAnim[currentAnimFrame].Size.X;
+                    float scaleY = BoxSizeMeters * PixelsPerMeter / texBoxAnim[currentAnimFrame].Size.Y;
+                    boxSprite.Scale = new Vector2f(scaleX / PixelsPerMeter, scaleY / PixelsPerMeter);
+
+                    foreach (var box in _boxes)
+                    {
+                        boxSprite.Position = new Vector2f(box.Position.X, box.Position.Y);
+                        boxSprite.Rotation = box.Rotation * (180f / (float)Math.PI);
+                        _window.Draw(boxSprite);
+                    }
                 }
+
+                _window.SetView(_window.DefaultView);
+
+                SfColor textShadowColor = new SfColor(20, 20, 20, 255);
+                DrawTextWithShadow(myFont, "[C] - Создать коробку, [X] - Очистить всё, [ESC] - Закрыть программу", new Vector2f(10, 830), 24, SfColor.Magenta, textShadowColor, 2);
+                DrawTextWithShadow(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new Vector2f(10, 800), 24, SfColor.Cyan, textShadowColor, 2);
+
+                string fpsText = $"FPS: {(int)(1f / dt)}";
+                DrawTextWithShadow(myFont, fpsText, new Vector2f(10, 770), 24, SfColor.Green, textShadowColor, 2);
+
+                _window.Display();
             }
-            // Рисуем UI
-            _window.SetView(_window.DefaultView);
-            SfColor textShadowColor = new SfColor(20, 20, 20, 255);
-            DrawTextWithShadow(myFont, "[C] - Создать коробку, [X] - Очистить всё, [ESC] - Закрыть программу", new Vector2f(10, 830), 24, SfColor.Magenta, textShadowColor, 2);
-            DrawTextWithShadow(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new Vector2f(10, 800), 24, SfColor.Cyan, textShadowColor, 2);
-            string fpsText = $"FPS: {(int)(1f / dt)}";
-            DrawTextWithShadow(myFont, fpsText, new Vector2f(10, 770), 24, SfColor.Green, textShadowColor, 2);
-            _window.Display();
+
+
+            // Очистка ресурсов
+            for (int i = 0; i < framesBox; i++) texBoxAnim[i].Dispose();
+            myFont.Dispose();
+            _window.Dispose();
+            _isRunning = false;
         }
-        // Очистка ресурсов
-        for (int i = 0; i < framesBox; i++) texBoxAnim[i].Dispose();
-        myFont.Dispose();
-        _window.Dispose();
-        _isRunning = false;
     }
     public static void DrawTextWithShadow(SfFont font, string textStr, Vector2f position, uint fontSize, SfColor textColor, SfColor shadowColor, float offset)
     {
