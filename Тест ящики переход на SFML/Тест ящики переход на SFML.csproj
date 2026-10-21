@@ -13,4 +13,10 @@
     <PackageReference Include="SFML.Net" Version="3.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="arial.ttf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

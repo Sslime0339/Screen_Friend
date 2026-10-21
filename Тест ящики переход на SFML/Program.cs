@@ -6,16 +6,16 @@ using SFML.Window;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 
-
-// Псевдонимы типов для исключения конфликтов векторов
+// Псевдонимы типов для исключения конфликтов векторов и системных типов
 using SysVector = System.Numerics.Vector2;
 using XnaVector = Microsoft.Xna.Framework.Vector2;
+using SfColor = SFML.Graphics.Color;
+using SfFont = SFML.Graphics.Font;
+using SfImage = SFML.Graphics.Image;
 
 struct WindowData
 {
@@ -151,19 +151,19 @@ class Program
         int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
         // Инициализируем окно SFML без рамки (Popup стиль)
-        VideoMode mode = new VideoMode((uint)workAreaWidth, (uint)workAreaHeight);
-        _window = new RenderWindow(mode, "SFML Velcro Physics Overlay", Styles.None);
+        VideoMode mode = new VideoMode(new Vector2u((uint)workAreaWidth, (uint)workAreaHeight));
+        _window = new RenderWindow(mode, "SFML Velcro Physics Overlay", Styles.None, State.Windowed);
         _window.SetFramerateLimit(60);
 
-        // Настройка WinAPI прозрачности для окна SFML
-        IntPtr windowHandle = _window.SystemHandle;
+        // Настройка WinAPI прозрачности для окна SFML через внутренний CPointer
+        IntPtr windowHandle = _window.CPointer;
         int initialExStyle = GetWindowLong(windowHandle, GWL_EXSTYLE);
 
         // Делаем окно Layered, Topmost и скрываем из Alt-Tab (ToolWindow)
         int targetStyle = initialExStyle | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
         SetWindowLong(windowHandle, GWL_EXSTYLE, targetStyle);
 
-        // Задаем черный цвет (Color.Black / 0x00000000) как полностью прозрачный ключ
+        // Задаем черный цвет (SfColor.Black) как полностью прозрачный ключ
         SetLayeredWindowAttributes(windowHandle, 0, 0, LWA_COLORKEY);
 
         // Физический мир
@@ -195,20 +195,17 @@ class Program
         rightWall.Restitution = 0.3f;
 
         // Камера (View) для физического мира (в метрах)
-        _physicsView = new View(new FloatRect(0, 0, viewWidthMeters, viewHeightMeters));
+        _physicsView = new View(new Vector2f(viewWidthMeters / 2f, viewHeightMeters / 2f), new Vector2f(viewWidthMeters, viewHeightMeters));
 
         // Шрифты
-        Font myFont = new Font("Arial.ttf");
+        SfFont myFont = new SfFont("Arial.ttf");
 
         // Загрузка текстур (Вместо GIF используем массив кадров)
-        // Замените на реальные файлы или используйте один и тот же спрайт
         int framesBox = 1;
         Texture[] texBoxAnim = new Texture[framesBox];
         for (int i = 0; i < framesBox; i++)
         {
-            // texBoxAnim[i] = new Texture($"resources/box_{i}.png");
-            // Для теста создадим пустую текстуру, если файлов нет:
-            Image img = new Image(60, 60, Color.Cyan);
+            SfImage img = new SfImage(new Vector2u(60, 60), SfColor.Cyan);
             texBoxAnim[i] = new Texture(img);
         }
 
@@ -293,7 +290,7 @@ class Program
                 _windowColliders.Clear();
                 foreach (var win in pendingWindows)
                 {
-                    Body windowBody = BodyFactory.CreateRectangle(_world, win.Width, win.Height, 1f, new XnaVector(win.CenterX, win.Y: win.CenterY));
+                    Body windowBody = BodyFactory.CreateRectangle(_world, win.Width, win.Height, 1f, new XnaVector(win.CenterX, win.CenterY));
                     windowBody.BodyType = BodyType.Static;
                     windowBody.Friction = 0.4f;
                     windowBody.Restitution = 0.2f;
@@ -309,8 +306,7 @@ class Program
                 timeCount -= frameDuration;
             }
             // --- ОТРИСОВКА ---
-            // Очищаем в черный цвет, так как он задан прозрачным в WinAPI слое
-            _window.Clear(Color.Black);
+            _window.Clear(SfColor.Black);
             // Рисуем физические объекты (переключаем View на метры)
             _window.SetView(_physicsView);
             lock (_lock)
@@ -322,17 +318,15 @@ class Program
                     RectangleShape rectShape = new RectangleShape(new Vector2f(win.Width, win.Height));
                     rectShape.Origin = new Vector2f(win.Width / 2f, win.Height / 2f);
                     rectShape.Position = new Vector2f(win.CenterX, win.CenterY);
-                    rectShape.FillColor = new Color(10, 20, 255, 60);
-                    rectShape.OutlineColor = new Color(10, 20, 255, 150);
+                    rectShape.FillColor = new SfColor(10, 20, 255, 60);
+                    rectShape.OutlineColor = new SfColor(10, 20, 255, 150);
                     rectShape.OutlineThickness = 0.05f;
                     _window.Draw(rectShape);
                 }
 #endif
                 // Рисуем динамические коробки
                 Sprite boxSprite = new Sprite(texBoxAnim[currentAnimFrame]);
-                // Центрируем Origin спрайта относительно текстуры
                 boxSprite.Origin = new Vector2f(texBoxAnim[currentAnimFrame].Size.X / 2f, texBoxAnim[currentAnimFrame].Size.Y / 2f);
-                // Масштабируем пиксельный спрайт под размер в метрах
                 float scaleX = BoxSizeMeters * PixelsPerMeter / texBoxAnim[currentAnimFrame].Size.X;
                 float scaleY = BoxSizeMeters * PixelsPerMeter / texBoxAnim[currentAnimFrame].Size.Y;
                 boxSprite.Scale = new Vector2f(scaleX / PixelsPerMeter, scaleY / PixelsPerMeter);
@@ -343,14 +337,13 @@ class Program
                     _window.Draw(boxSprite);
                 }
             }
-            // Рисуем UI (возвращаем стандартную камеру в пикселях)
+            // Рисуем UI
             _window.SetView(_window.DefaultView);
-            Color textShadowColor = new Color(20, 20, 20, 255);
-            DrawTextWithShadow(myFont, "[C] - Создать коробку, [X] - Очистить всё, [ESC] - Закрыть программу", new Vector2f(10, 830), 24, Color.Magenta, textShadowColor, 2);
-            DrawTextWithShadow(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new Vector2f(10, 800), 24, Color.Cyan, textShadowColor, 2);
-            // FPS Счетчик
+            SfColor textShadowColor = new SfColor(20, 20, 20, 255);
+            DrawTextWithShadow(myFont, "[C] - Создать коробку, [X] - Очистить всё, [ESC] - Закрыть программу", new Vector2f(10, 830), 24, SfColor.Magenta, textShadowColor, 2);
+            DrawTextWithShadow(myFont, $"Окон-препятствий: {_windowColliders.Count} | Коробок: {_boxes.Count}", new Vector2f(10, 800), 24, SfColor.Cyan, textShadowColor, 2);
             string fpsText = $"FPS: {(int)(1f / dt)}";
-            DrawTextWithShadow(myFont, fpsText, new Vector2f(10, 770), 24, Color.Green, textShadowColor, 2);
+            DrawTextWithShadow(myFont, fpsText, new Vector2f(10, 770), 24, SfColor.Green, textShadowColor, 2);
             _window.Display();
         }
         // Очистка ресурсов
@@ -359,11 +352,10 @@ class Program
         _window.Dispose();
         _isRunning = false;
     }
-    public static void DrawTextWithShadow(Font font, string textStr, Vector2f position, uint fontSize, Color textColor, Color shadowColor, float offset)
+    public static void DrawTextWithShadow(SfFont font, string textStr, Vector2f position, uint fontSize, SfColor textColor, SfColor shadowColor, float offset)
     {
-        Text text = new Text(textStr, font, fontSize);
-        // Рисуем контурную тень по 8 направлениям
-        text.Color = shadowColor;
+        Text text = new Text(font, textStr, fontSize);
+        text.FillColor = shadowColor;
         Vector2f[] offsets = {
 new Vector2f(-offset, 0), new Vector2f(offset, 0),
 new Vector2f(0, -offset), new Vector2f(0, offset),
@@ -375,8 +367,7 @@ new Vector2f(-offset, offset), new Vector2f(offset, offset)
             text.Position = position + o;
             _window.Draw(text);
         }
-        // Рисуем основной текст
-        text.Color = textColor;
+        text.FillColor = textColor;
         text.Position = position;
         _window.Draw(text);
     }
@@ -397,7 +388,6 @@ new Vector2f(-offset, offset), new Vector2f(offset, offset)
             bool isHoveringBox = false;
             lock (_lock)
             {
-                // Трансформируем экранные координаты мыши в координаты физического мира SFML
                 Vector2f mouseWorldSFML = _window.MapPixelToCoords(new Vector2i(_mouseX, _mouseY), _physicsView);
                 XnaVector mouseWorldPos = new XnaVector(mouseWorldSFML.X, mouseWorldSFML.Y);
                 for (int i = _boxes.Count - 1; i >= 0; i--)
@@ -412,17 +402,13 @@ new Vector2f(-offset, offset), new Vector2f(offset, offset)
                     }
                 }
             }
-            // Динамическое изменение прозрачности для клика:
-            // Если мышка над коробкой, окно улавливает клики. Иначе — клик идет сквозь окно.
             int currentExStyle = GetWindowLong(windowHandle, GWL_EXSTYLE);
             if (isHoveringBox || _draggedBox != null)
             {
-                // Убираем флаг WS_EX_TRANSPARENT, чтобы клик регистрировался
                 SetWindowLong(windowHandle, GWL_EXSTYLE, currentExStyle & ~WS_EX_TRANSPARENT);
             }
             else
             {
-                // Добавляем флаг WS_EX_TRANSPARENT для сквозного клика
                 SetWindowLong(windowHandle, GWL_EXSTYLE, currentExStyle | WS_EX_TRANSPARENT);
             }
             if (_mouseX != _lastMouseX || _mouseY != _lastMouseY)
