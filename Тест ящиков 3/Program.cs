@@ -102,7 +102,19 @@ class Program
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     private const int SW_RESTORE = 9; // Константа для восстановления окна из свернутого состояния
+    private const int SW_SHOWNOACTIVATE = 4;
 
+    /*
+    // для установки флага чтобы программа не сворачивалась
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    */
 
 
 
@@ -151,7 +163,8 @@ class Program
             ConfigFlags.MousePassthroughWindow |
             ConfigFlags.UndecoratedWindow |
             ConfigFlags.TransparentWindow |
-            ConfigFlags.TopmostWindow
+            ConfigFlags.TopmostWindow |
+            ConfigFlags.AlwaysRunWindow
         );
 
         //int screenWidth = Raylib.GetMonitorWidth(Raylib.GetCurrentMonitor());
@@ -343,14 +356,14 @@ class Program
             }
         });
 
-
+        
         IntPtr windowHandle;
         // Получаем системный Handle нашего окна Raylib
         unsafe
         {
             windowHandle = (IntPtr)Raylib.GetWindowHandle();
         }
-
+        /*
 
         // Фоновая задача на чистом WinAPI, работающая в обход замороженного потока Raylib
         _ = Task.Run(async () =>
@@ -362,14 +375,21 @@ class Program
                 {
                     // Принудительно восстанавливаем окно силами Windows
                     ShowWindow(windowHandle, SW_RESTORE);
+                    ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
                 }
 
                 await Task.Delay(50); // Проверка каждые 50мс
             }
         });
 
+        */
 
 
+
+        // Задаем стиль ToolWindow. Это защитит оверлей от Aero Shake, 
+        // а также скроет его из меню Alt+Tab (что полезно для оверлеев)
+        //int exStyle = GetWindowLong(windowHandle, GWL_EXSTYLE);
+        //SetWindowLong(windowHandle, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
 
 
 
@@ -378,6 +398,33 @@ class Program
         {
 
 
+            // --- ЛОГИКА ВОССТАНОВЛЕНИЯ ПОСЛЕ СВОРУЧИВАНИЯ ---
+            // Если Raylib обнаружила, что окно свернули:
+            if (Raylib.IsWindowMinimized())
+            {
+                // 1. Принудительно разворачиваем его обратно средствами Raylib
+                //Raylib.RestoreWindow();
+
+                ShowWindow(windowHandle, SW_RESTORE);
+
+
+                Console.WriteLine("окно свёрнуто");
+
+                // 2. Сбрасываем флаги окна. Принудительно выключаем и включаем прозрачность и безрамочность.
+                // Это заставит GLFW и Windows полностью перерисовать контекст с нуля и уберет "зависание"
+                
+                //Raylib.ClearWindowState(ConfigFlags.TransparentWindow | ConfigFlags.UndecoratedWindow);
+
+                // Даем Windows 10-20 миллисекунд прийти в себя
+                
+                //System.Threading.Thread.Sleep(16);
+
+                //Raylib.SetWindowState(ConfigFlags.TransparentWindow | ConfigFlags.UndecoratedWindow | ConfigFlags.TopmostWindow);
+
+                // 3. Пропускаем текущий поврежденный кадр рендеринга, переходя к следующему чистому
+                
+                //continue;
+            }
 
 
             float dt = Raylib.GetFrameTime();
