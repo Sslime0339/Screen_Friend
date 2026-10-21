@@ -1,7 +1,5 @@
-using Raylib_cs;
+﻿using Raylib_cs;
 using System;
-using System.Threading;
-using System.Threading.Tasks;
 using SysVector = System.Numerics.Vector2;
 
 internal static class Program
@@ -9,7 +7,7 @@ internal static class Program
     private const float PixelsPerMeter = 50f;
     private static volatile bool _isRunning = true;
 
-    private static async Task Main(string[] args)
+    private static void Main(string[] args)
     {
         var windows = new Win32WindowProvider();
         var workArea = Win32WindowProvider.GetWorkArea();
@@ -33,9 +31,6 @@ internal static class Program
         var scene = new Scene(factory, physics);
         var input = new InputController(physics, scene, PixelsPerMeter);
 
-        using var cancellation = new CancellationTokenSource();
-        Task windowScanTask = windows.RunScannerAsync(cancellation.Token);
-
         try
         {
             while (_isRunning && !Raylib.WindowShouldClose())
@@ -43,7 +38,7 @@ internal static class Program
                 float dt = Raylib.GetFrameTime();
 
                 input.Update(ref _isRunning);
-                physics.SetWindowObstacles(windows.GetLatestSnapshot());
+                physics.SetWindowObstacles(windows.Update(), dt);
                 physics.Step(Math.Min(dt, 1f / 60f));
 
                 scene.RemoveObjectsWithoutBodies();
@@ -53,11 +48,6 @@ internal static class Program
         finally
         {
             _isRunning = false;
-            cancellation.Cancel();
-
-            try { await windowScanTask; }
-            catch (OperationCanceledException) { }
-
             renderer.Dispose();
             physics.Dispose();
             Raylib.CloseWindow();

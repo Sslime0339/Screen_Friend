@@ -86,7 +86,7 @@ internal sealed class PhysicsWorldService : IDisposable
 /// Сверяет текущее состояние окон с сохранённым снимком:
 /// новые HWND создаёт, исчезнувшие удаляет, перемещённые/изменившиеся обновляет.
 /// </summary>
-public void SetWindowObstacles(IReadOnlyList<WindowData> windows)
+public void SetWindowObstacles(IReadOnlyList<WindowData> windows, float dt)
     {
         var currentHandles = new HashSet<nint>();
 
@@ -96,40 +96,46 @@ public void SetWindowObstacles(IReadOnlyList<WindowData> windows)
 
             if (_windowBodies.TryGetValue(window.Handle, out var existing))
             {
-                if (GeometryChanged(existing.Data, window))
+                bool sizeChanged =
+                    Math.Abs(existing.Data.Width - window.Width) > 0.01f ||
+                    Math.Abs(existing.Data.Height - window.Height) > 0.01f;
+
+                Body updatedBody = existing.Body;
+                if (sizeChanged)
                 {
-                    bool sizeChanged =
-                        Math.Abs(existing.Data.Width - window.Width) > 0.01f ||
-                        Math.Abs(existing.Data.Height - window.Height) > 0.01f;
+                    // Размер формы изменился: пересоздаём тело с прежним типом Kinematic.
+                    _world.DestroyBody(existing.Body);
+                    updatedBody = BodyFactory.CreateRectangle(
+                        _world, window.Width, window.Height, 1f,
+                        new Vector2(window.CenterX, window.CenterY));
+                    updatedBody.BodyType = BodyType.Kinematic;
+                    updatedBody.Friction = 0.4f;
+                    updatedBody.Restitution = 0.2f;
 
-                    Body updatedBody = existing.Body;
-                    if (sizeChanged)
+                    int colliderIndex = _windowColliders.IndexOf(existing.Body);
+                    if (colliderIndex >= 0)
+                        _windowColliders[colliderIndex] = updatedBody;
+                }
+                else
+                {
+                    // Kinematic тело перемещается физическим движком через LinearVelocity.
+                    // При отсутствии движения обязательно сбрасываем скорость, иначе тело
+                    // продолжит ехать с последней скоростью.
+                    float safeDt = Math.Max(dt, 1e-5f);
+                    Vector2 terget = new Vector2(window.CenterX, window.CenterY);
+                    Vector2 delta = terget - existing.Body.Position;
+                    if (Math.Abs(delta.X) > 0.0001f || Math.Abs(delta.Y) > 0.0001f)
                     {
-                        // Размер физической формы изменился: пересоздаём только это тело.
-                        _world.DestroyBody(existing.Body);
-                        updatedBody = BodyFactory.CreateRectangle(
-                            _world, window.Width, window.Height, 1f,
-                            new Vector2(window.CenterX, window.CenterY));
-                        updatedBody.BodyType = BodyType.Static;
-                        updatedBody.Friction = 0.4f;
-                        updatedBody.Restitution = 0.2f;
-
-                        int colliderIndex = _windowColliders.IndexOf(existing.Body);
-                        if (colliderIndex >= 0)
-                            _windowColliders[colliderIndex] = updatedBody;
+                        updatedBody.LinearVelocity = delta / safeDt;
+                        updatedBody.Awake = true;
                     }
                     else
                     {
-                        // Перемещение: сохраняем тело и меняем его transform.
-                        updatedBody.SetTransform(
-                            new Vector2(window.CenterX, window.CenterY),
-                            updatedBody.Rotation);
-                        updatedBody.Awake = true;
+                        updatedBody.LinearVelocity = Vector2.Zero;
                     }
-
-                    _windowBodies[window.Handle] = (updatedBody, window);
                 }
 
+                _windowBodies[window.Handle] = (updatedBody, window);
                 continue;
             }
 

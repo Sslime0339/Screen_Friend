@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 internal sealed class GameObjectFactory
 {
@@ -18,7 +18,6 @@ internal sealed class GameObjectFactory
             body,
             _physics.BoxSize,
             _physics.BoxSize,
-            new EmptyBehavior()
-        );
+            new EmptyBehavior());
     }
 }
