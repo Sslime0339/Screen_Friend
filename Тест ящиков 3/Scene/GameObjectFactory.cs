@@ -17,6 +17,8 @@ internal sealed class GameObjectFactory
             GameObjectKind.Box,
             body,
             _physics.BoxSize,
-            _physics.BoxSize);
+            _physics.BoxSize,
+            new EmptyBehavior()
+        );
     }
 }

@@ -47,6 +47,17 @@ internal sealed class PhysicsWorldService : IDisposable
         return body;
     }
 
+    public bool RemoveBox(Body body)
+    {
+        int index = _boxes.IndexOf(body);
+        if (index < 0)
+            return false;
+
+        _world.DestroyBody(body);
+        _boxes.RemoveAt(index);
+        return true;
+    }
+
     public void ClearBoxes()
     {
         foreach (var box in _boxes)

@@ -11,6 +11,7 @@ internal sealed class InputController
     private const int VK_ESCAPE = 0x1B;
     private const int VK_C = 0x43;
     private const int VK_X = 0x58;
+    private const int VK_DELETE = 0x2E;
     private const int VK_LBUTTON = 0x01;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -28,7 +29,7 @@ internal sealed class InputController
     private int _mouseX, _mouseY, _lastMouseX, _lastMouseY;
     private long _lastMoveTimestamp;
     private Body? _draggedBox;
-    private bool _wasCPressed, _wasXPressed, _wasLButtonPressed;
+    private bool _wasCPressed, _wasXPressed, _wasDeletePressed, _wasLButtonPressed;
 
     public InputController(PhysicsWorldService physics, Scene scene, float pixelsPerMeter)
     {
@@ -81,6 +82,15 @@ internal sealed class InputController
             _draggedBox = null;
         }
         _wasXPressed = xPressed;
+
+        bool deletePressed = (GetAsyncKeyState(VK_DELETE) & 0x8000) != 0;
+        if (deletePressed && !_wasDeletePressed)
+        {
+            var target = _scene.FindAt(_mouseX / _pixelsPerMeter, _mouseY / _pixelsPerMeter);
+            if (target != null && target.Body != _draggedBox)
+                _scene.Remove(target);
+        }
+        _wasDeletePressed = deletePressed;
 
         bool leftDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
         if (leftDown && !_wasLButtonPressed)

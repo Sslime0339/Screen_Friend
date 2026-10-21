@@ -6,8 +6,8 @@ internal enum GameObjectKind
 }
 
 /// <summary>
-/// Игровой объект сцены. На этом этапе физическое состояние хранится в Body,
-/// а GameObject содержит идентичность и параметры отображения.
+/// Игровой объект сцены. Физическое состояние хранится в Body,
+/// поведение объекта отделено через IGameObjectBehavior.
 /// </summary>
 internal sealed class GameObject
 {
@@ -16,13 +16,27 @@ internal sealed class GameObject
     public Body Body { get; }
     public float Width { get; }
     public float Height { get; }
+    public IGameObjectBehavior Behavior { get; }
 
-    public GameObject(string id, GameObjectKind kind, Body body, float width, float height)
+    public GameObject(
+        string id,
+        GameObjectKind kind,
+        Body body,
+        float width,
+        float height,
+        IGameObjectBehavior behavior)
     {
         Id = id;
         Kind = kind;
         Body = body;
         Width = width;
         Height = height;
+        Behavior = behavior;
     }
+
+    public void Update(Scene scene, float deltaTime) =>
+        Behavior.Update(this, scene, deltaTime);
+
+    public void NotifyRemoved(Scene scene) =>
+        Behavior.OnRemoved(this, scene);
 }

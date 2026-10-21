@@ -22,16 +22,43 @@ internal sealed class Scene
         return gameObject;
     }
 
+    public void Update(float deltaTime)
+    {
+        // Snapshot позволяет поведению создавать/удалять объекты без изменения
+        // коллекции, по которой прямо сейчас идёт итерация.
+        foreach (var gameObject in _objects.ToArray())
+        {
+            if (_objects.Contains(gameObject))
+                gameObject.Update(this, deltaTime);
+        }
+    }
+
+    public bool Remove(GameObject gameObject)
+    {
+        if (!_objects.Contains(gameObject))
+            return false;
+
+        gameObject.NotifyRemoved(this);
+        _physics.RemoveBox(gameObject.Body);
+        _objects.Remove(gameObject);
+        return true;
+    }
+
+    public GameObject? FindAt(float x, float y)
+    {
+        var body = _physics.FindBoxAt(x, y);
+        return body == null ? null : _objects.LastOrDefault(item => item.Body == body);
+    }
+
     public void Clear()
     {
+        foreach (var gameObject in _objects.ToArray())
+            gameObject.NotifyRemoved(this);
+
         _physics.ClearBoxes();
         _objects.Clear();
     }
 
-    /// <summary>
-    /// Удаляет из списка объекты, тела которых были удалены физическим миром.
-    /// Нужен как страховка при будущих сценариях удаления отдельных объектов.
-    /// </summary>
     public void RemoveObjectsWithoutBodies()
     {
         var liveBodies = _physics.Boxes.ToHashSet();

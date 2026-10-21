@@ -94,7 +94,7 @@ internal sealed class RaylibRenderer : IDisposable
             $"Окон-препятствий: {physics.WindowColliders.Count} | Объектов сцены: {scene.Objects.Count}",
             new SysVector(10, 800), 24, 2, Color.Pink, shadow, TextOffset);
         DrawTextWithShadow(
-            "[C] - Создать коробку, [X] - Очистить всё, [ESC] - Закрыть программу",
+            "[C] - Создать, [Delete] - Удалить объект под курсором, [X] - Очистить, [ESC] - Выход",
             new SysVector(10, 830), 24, 2, Color.Purple, shadow, TextOffset);
         Raylib.DrawFPS(10, 770);
         Raylib.EndDrawing();
