@@ -103,6 +103,26 @@ class Program
 
     private const int SW_RESTORE = 9; // Константа для восстановления окна из свернутого состояния
 
+    // --- WinAPI для перехвата сообщений окна (WndProc) ---
+    private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, WndProcDelegate dwNewLong);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    private const int GWL_WNDPROC = -4;
+    private const uint WM_SYSCOMMAND = 0x0112;
+    private const int SC_MINIMIZE = 0xF020;
+
+    private static IntPtr _originalWndProc = IntPtr.Zero;
+    private static WndProcDelegate _newWndProcInstance; // Держим ссылку, чтобы GC её не удалил
+
+
+
+
+
 
 
 
@@ -345,29 +365,15 @@ class Program
 
 
         IntPtr windowHandle;
-        // Получаем системный Handle нашего окна Raylib
+
+
+        // Внедряем наш WndProc для полной блокировки сворачивания
         unsafe
         {
             windowHandle = (IntPtr)Raylib.GetWindowHandle();
+            _newWndProcInstance = new WndProcDelegate(CustomWndProc);
+            _originalWndProc = SetWindowLongPtr(windowHandle, GWL_WNDPROC, _newWndProcInstance);
         }
-
-
-        // Фоновая задача на чистом WinAPI, работающая в обход замороженного потока Raylib
-        _ = Task.Run(async () =>
-        {
-            while (_isRunning)
-            {
-                // Проверяем, свернуто ли наше окно оверлея
-                if (IsIconic(windowHandle)) // Функция IsIconic уже есть в вашем коде!
-                {
-                    // Принудительно восстанавливаем окно силами Windows
-                    ShowWindow(windowHandle, SW_RESTORE);
-                }
-
-                await Task.Delay(50); // Проверка каждые 50мс
-            }
-        });
-
 
 
 
@@ -658,6 +664,28 @@ class Program
         }
         _wasLButtonPressed = isLButtonDown;
     }
+
+
+
+    private static IntPtr CustomWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+    {
+        // Перехватываем системную команду сворачивания окна
+        if (msg == WM_SYSCOMMAND && ((int)wParam & 0xFFF0) == SC_MINIMIZE)
+        {
+            // Просто игнорируем команду минимизации (окно физически НЕ свернется вообще!)
+            return IntPtr.Zero;
+        }
+
+        // Все остальные сообщения передаем обратно операционной системе
+        return CallWindowProc(_originalWndProc, hWnd, msg, wParam, lParam);
+    }
+
+
+
+
+
+
+
     private static void InitializeMousePosition()
     {
         if (GetCursorPos(out Point point))
