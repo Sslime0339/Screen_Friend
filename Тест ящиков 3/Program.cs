@@ -116,6 +116,25 @@ class Program
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     */
 
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_LAYERED = 0x00080000;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const uint LWA_ALPHA = 0x00000002;
+
+    private static int targetExStyle;
+
+    private static IntPtr windowHandle;
+
 
 
 
@@ -357,7 +376,6 @@ class Program
         });
 
         
-        IntPtr windowHandle;
         // Получаем системный Handle нашего окна Raylib
         unsafe
         {
@@ -393,6 +411,22 @@ class Program
 
 
 
+        // 1. Получаем текущие расширенные стили окна
+        int currentExStyle = GetWindowLong(windowHandle, GWL_EXSTYLE);
+
+        // 2. Внедряем ультимативный набор флагов:
+        // LAYERED + TRANSPARENT делают окно "призрачным" для всех системных жестов сворачивания Windows (включая Aero Shake)
+        // TOOLWINDOW убирает его из панели задач и предотвращает минимизацию
+        targetExStyle = currentExStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW;
+        SetWindowLong(windowHandle, GWL_EXSTYLE, targetExStyle);
+
+        // 3. Подтверждаем слоистые атрибуты для Windows, выставляя полную непрозрачность (255) альфа-канала самого окна оверлея
+        SetLayeredWindowAttributes(windowHandle, 0, 255, LWA_ALPHA);
+
+
+
+
+
         // Основной игровой цикл
         while (_isRunning && !Raylib.WindowShouldClose())
         {
@@ -405,7 +439,7 @@ class Program
                 // 1. Принудительно разворачиваем его обратно средствами Raylib
                 //Raylib.RestoreWindow();
 
-                ShowWindow(windowHandle, SW_RESTORE);
+                //ShowWindow(windowHandle, SW_RESTORE);
 
 
                 Console.WriteLine("окно свёрнуто");
@@ -579,7 +613,7 @@ class Program
             _lastMouseY = _mouseY;
             _mouseX = point.X;
             _mouseY = point.Y;
-            // --- НОВАЯ ЛОГИКА ДИНАМИЧЕСКОГО КЛИКА НА СКВОЗЬ ---
+            // --- НОВАЯ ЛОГИКА ДИНАМИЧЕСКОГО КЛИКА НА СКВОЗЬ ---            // --- ОБНОВЛЕННАЯ ЛОГИКА ДИНАМИЧЕСКОГО КЛИКА НА СКВОЗЬ ЧЕРЕЗ WinAPI ---
             bool isHoveringBox = false;
             lock (_lock)
             {
@@ -589,23 +623,27 @@ class Program
                     var box = _boxes[i];
                     float halfSize = BoxSizeMeters / 2f;
                     if (mouseWorldPos.X >= box.Position.X - halfSize && mouseWorldPos.X <= box.Position.X + halfSize &&
-                    mouseWorldPos.Y >= box.Position.Y - halfSize && mouseWorldPos.Y <= box.Position.Y + halfSize)
+                        mouseWorldPos.Y >= box.Position.Y - halfSize && mouseWorldPos.Y <= box.Position.Y + halfSize)
                     {
                         isHoveringBox = true;
                         break;
                     }
                 }
             }
-            // Если мы навели на коробку или уже тащим её — окно должно принимать клики.
-            // Если курсор на пустом месте — включаем флаг Passthrough, чтобы клик пролетал дальше в Windows.
+
+            // Напрямую управляем флагом клика (WS_EX_TRANSPARENT) на уровне ОС Windows
             if (isHoveringBox || _draggedBox != null)
             {
-                Raylib.ClearWindowState(ConfigFlags.MousePassthroughWindow);
+                // Если мышка над коробкой, УБИРАЕМ сквозной клик (окно ловит мышь, чтобы таскать физику)
+                SetWindowLong(windowHandle, GWL_EXSTYLE, targetExStyle & ~WS_EX_TRANSPARENT);
             }
             else
             {
-                Raylib.SetWindowState(ConfigFlags.MousePassthroughWindow);
+                // Если на пустом месте, ВОЗВРАЩАЕМ сквозной клик (клики летят в Проводник / другие окна)
+                SetWindowLong(windowHandle, GWL_EXSTYLE, targetExStyle);
             }
+            // ----------------------------------------------------------------------
+
             // --------------------------------------------------
             if (_mouseX != _lastMouseX || _mouseY != _lastMouseY)
             {
