@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -23,31 +24,20 @@ internal sealed class Win32WindowProvider
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
-
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hWnd);
-
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hWnd);
-
     [DllImport("user32.dll")]
     private static extern bool IsZoomed(IntPtr hWnd);
-
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
-
     [DllImport("dwmapi.dll")]
-    private static extern int DwmGetWindowAttribute(
-        IntPtr hWnd, int attribute, out bool value, int valueSize);
-
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out bool value, int valueSize);
     [DllImport("dwmapi.dll")]
-    private static extern int DwmGetWindowAttribute(
-        IntPtr hWnd, int attribute, out RECT rect, int valueSize);
-
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out RECT rect, int valueSize);
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SystemParametersInfo(
-        int action, int param, ref RECT rect, int flags);
-
+    private static extern bool SystemParametersInfo(int action, int param, ref RECT rect, int flags);
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
 
@@ -61,11 +51,7 @@ internal sealed class Win32WindowProvider
     {
         RECT rect = new();
         if (!SystemParametersInfo(SPI_GETWORKAREA, 0, ref rect, 0))
-        {
-            int width = GetSystemMetrics(SM_CXSCREEN);
-            int height = GetSystemMetrics(SM_CYSCREEN);
-            return (0, 0, width, height);
-        }
+            return (0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
 
         return (rect.Left, rect.Top, rect.Right, rect.Bottom);
     }
@@ -78,19 +64,20 @@ internal sealed class Win32WindowProvider
 
     public async Task RunScannerAsync(CancellationToken cancellationToken)
     {
-        var workArea = GetWorkArea();
-        int workWidth = workArea.Right - workArea.Left;
-        int workHeight = workArea.Bottom - workArea.Top;
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        const int scanIntervalMs = 250;
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            var workArea = GetWorkArea();
+            int workWidth = workArea.Right - workArea.Left;
+            int workHeight = workArea.Bottom - workArea.Top;
+            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
             var found = new List<WindowData>();
 
             EnumWindows((hWnd, _) =>
             {
-                if (!IsWindowVisible(hWnd))
+                if (!IsWindowVisible(hWnd) || IsIconic(hWnd) || IsZoomed(hWnd))
                     return true;
 
                 var title = new StringBuilder(256);
@@ -98,35 +85,30 @@ internal sealed class Win32WindowProvider
                 if (string.IsNullOrWhiteSpace(title.ToString()))
                     return true;
 
-                if (DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool cloaked, sizeof(bool)) == 0
-                    && cloaked)
+                if (DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool cloaked, sizeof(bool)) == 0 && cloaked)
                     return true;
 
-                if (DwmGetWindowAttribute(
-                    hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT rect,
-                    Marshal.SizeOf<RECT>()) != 0)
+                if (DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT rect, Marshal.SizeOf<RECT>()) != 0)
                     return true;
 
                 int width = rect.Right - rect.Left;
                 int height = rect.Bottom - rect.Top;
-                int x = rect.Left;
-                int y = rect.Top;
-
-                if (width <= 16 || height <= 16 || x < -10000 || y < -10000)
+                if (width <= 16 || height <= 16 || rect.Left < -10000 || rect.Top < -10000)
                     return true;
 
                 bool isOverlaySize =
                     (width == workWidth && height == workHeight) ||
                     (width == screenWidth && height == screenHeight);
 
-                if (!isOverlaySize && !IsZoomed(hWnd) && !IsIconic(hWnd))
+                if (!isOverlaySize)
                 {
                     const float pixelsPerMeter = 50f;
                     found.Add(new WindowData(
+                        hWnd,
                         width / pixelsPerMeter,
                         height / pixelsPerMeter,
-                        (x + width / 2f) / pixelsPerMeter,
-                        (y + height / 2f) / pixelsPerMeter));
+                        (rect.Left + width / 2f) / pixelsPerMeter,
+                        (rect.Top + height / 2f) / pixelsPerMeter));
                 }
 
                 return true;
@@ -135,7 +117,7 @@ internal sealed class Win32WindowProvider
             lock (_snapshotLock)
                 _latestSnapshot = found.ToArray();
 
-            await Task.Delay(100, cancellationToken);
+            await Task.Delay(scanIntervalMs, cancellationToken);
         }
     }
 }

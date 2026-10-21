@@ -14,7 +14,7 @@ internal sealed class PhysicsWorldService : IDisposable
     private readonly float _pixelsPerMeter;
     private readonly int _screenWidth;
     private readonly int _screenHeight;
-    private WindowData[] _lastWindowSnapshot = Array.Empty<WindowData>();
+    private readonly Dictionary<nint, (Body Body, WindowData Data)> _windowBodies = new();
     private bool _disposed;
 
     public IReadOnlyList<Body> Boxes => _boxes;
@@ -82,32 +82,88 @@ internal sealed class PhysicsWorldService : IDisposable
 
     public bool ContainsBox(Body body) => _boxes.Contains(body);
 
-    public void SetWindowObstacles(IReadOnlyList<WindowData> windows)
+/// <summary>
+/// Сверяет текущее состояние окон с сохранённым снимком:
+/// новые HWND создаёт, исчезнувшие удаляет, перемещённые/изменившиеся обновляет.
+/// </summary>
+public void SetWindowObstacles(IReadOnlyList<WindowData> windows)
     {
-        if (windows.Count == _lastWindowSnapshot.Length &&
-            windows.SequenceEqual(_lastWindowSnapshot))
-            return;
-
-        foreach (var collider in _windowColliders)
-            _world.DestroyBody(collider);
-        _windowColliders.Clear();
+        var currentHandles = new HashSet<nint>();
 
         foreach (var window in windows)
         {
-            Body body = BodyFactory.CreateRectangle(
-                _world,
-                window.Width,
-                window.Height,
-                1f,
-                new Vector2(window.CenterX, window.CenterY));
+            currentHandles.Add(window.Handle);
 
+            if (_windowBodies.TryGetValue(window.Handle, out var existing))
+            {
+                if (GeometryChanged(existing.Data, window))
+                {
+                    bool sizeChanged =
+                        Math.Abs(existing.Data.Width - window.Width) > 0.01f ||
+                        Math.Abs(existing.Data.Height - window.Height) > 0.01f;
+
+                    Body updatedBody = existing.Body;
+                    if (sizeChanged)
+                    {
+                        // Размер физической формы изменился: пересоздаём только это тело.
+                        _world.DestroyBody(existing.Body);
+                        updatedBody = BodyFactory.CreateRectangle(
+                            _world, window.Width, window.Height, 1f,
+                            new Vector2(window.CenterX, window.CenterY));
+                        updatedBody.BodyType = BodyType.Static;
+                        updatedBody.Friction = 0.4f;
+                        updatedBody.Restitution = 0.2f;
+
+                        int colliderIndex = _windowColliders.IndexOf(existing.Body);
+                        if (colliderIndex >= 0)
+                            _windowColliders[colliderIndex] = updatedBody;
+                    }
+                    else
+                    {
+                        // Перемещение: сохраняем тело и меняем его transform.
+                        updatedBody.SetTransform(
+                            new Vector2(window.CenterX, window.CenterY),
+                            updatedBody.Rotation);
+                        updatedBody.Awake = true;
+                    }
+
+                    _windowBodies[window.Handle] = (updatedBody, window);
+                }
+
+                continue;
+            }
+
+            Body body = BodyFactory.CreateRectangle(
+                _world, window.Width, window.Height, 1f,
+                new Vector2(window.CenterX, window.CenterY));
             body.BodyType = BodyType.Static;
             body.Friction = 0.4f;
             body.Restitution = 0.2f;
+
+            _windowBodies.Add(window.Handle, (body, window));
             _windowColliders.Add(body);
         }
 
-        _lastWindowSnapshot = windows.ToArray();
+        var removedHandles = _windowBodies.Keys
+            .Where(handle => !currentHandles.Contains(handle))
+            .ToArray();
+
+        foreach (var handle in removedHandles)
+        {
+            Body body = _windowBodies[handle].Body;
+            _world.DestroyBody(body);
+            _windowBodies.Remove(handle);
+            _windowColliders.Remove(body);
+        }
+    }
+
+    private static bool GeometryChanged(WindowData oldData, WindowData newData)
+    {
+        const float epsilon = 0.01f;
+        return Math.Abs(oldData.Width - newData.Width) > epsilon
+            || Math.Abs(oldData.Height - newData.Height) > epsilon
+            || Math.Abs(oldData.CenterX - newData.CenterX) > epsilon
+            || Math.Abs(oldData.CenterY - newData.CenterY) > epsilon;
     }
 
     public void Step(float dt) => _world.Step(dt);
@@ -148,9 +204,10 @@ internal sealed class PhysicsWorldService : IDisposable
         if (_disposed) return;
         ClearBoxes();
 
-        foreach (var collider in _windowColliders)
+        foreach (var collider in _windowColliders.ToArray())
             _world.DestroyBody(collider);
         _windowColliders.Clear();
+        _windowBodies.Clear();
 
         _disposed = true;
     }
