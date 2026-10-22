@@ -3,6 +3,7 @@
   <Project Path="Тест sharpHook Втрой/Тест sharpHook Втрой ящики.csproj" Id="c1c24fa3-677f-4ed4-b8cb-3924945beda7" />
   <Project Path="Тест SharpHook/Тест SharpHook.csproj" Id="bd99c7b7-624a-4c40-aa36-012a1bf9c410" />
   <Project Path="Тест получение всех окон/Тест получение всех окон.csproj" Id="2897e28e-3112-4b1f-a146-a036f28bfeef" />
+  <Project Path="Тест получения открывающихся окон/Тест получения открывающихся окон.csproj" Id="2f7a70bb-11a8-4770-a482-a99ade7ddcd3" />
   <Project Path="Тест с ящиками 2/Тест с ящиками 2.csproj" Id="9e0b8f1f-0376-4505-959f-23a88030fb9b" />
   <Project Path="Тест физики Velcro Physics/Тест физики Velcro Physics.csproj" Id="c3ff8a29-4505-47e6-a370-01575da60687" />
   <Project Path="Тест ящики переход на SFML/Тест ящики переход на SFML.csproj" Id="f69d021e-3785-442c-b371-86431f0586e4" />
