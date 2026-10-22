@@ -68,10 +68,23 @@ internal sealed class RaylibRenderer : IDisposable
         Raylib.BeginMode2D(_camera);
 
 #if DEBUG
-        foreach (var _ in physics.WindowColliders)
+        /*
+        foreach (var win in physics.WindowColliders)
         {
-            // Коллайдеры можно визуализировать отдельно при необходимости.
+                // Вычисляем верхний левый угол на основе центра и размеров
+                float leftMeters = win.Position.X - (win. / 2f);
+                float topMeters = win.Position.X - (win. / 2f);
+
+                var rect = new Rectangle(leftMeters, topMeters, win.Width, win.Height);
+
+                // Рисуем полупрозрачное окно
+                Raylib.DrawRectangleRec(rect, new Color(10, 20, 255, 60));
+
+                // Рисуем контур окна
+                Raylib.DrawRectangleLinesEx(rect, 0.05f, new Color(10, 20, 255, 150));
+            
         }
+        */
 #endif
 
         foreach (GameObject gameObject in scene.Objects)

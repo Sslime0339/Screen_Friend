@@ -19,6 +19,7 @@ internal sealed class PhysicsWorldService : IDisposable
 
     public IReadOnlyList<Body> Boxes => _boxes;
     public IReadOnlyList<Body> WindowColliders => _windowColliders;
+    //public IReadOnlyList<WindowData> WindowDatas => 
     public World World => _world;
     public float BoxSize => BoxSizeMeters;
 
