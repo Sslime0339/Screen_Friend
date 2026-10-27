@@ -184,8 +184,9 @@ namespace VirtualFriend
             // --- 3. ХВАТАНИЕ И ПЕРЕТАСКИВАНИЕ (Левая кнопка мыши) ---
             SysVector currentMouseWorld = _inputManager.GetMouseWorldPosition();
 
-            // СОБЫТИЕ: Клик только что произошел (Нажатие)
-            if (_inputManager.IsLButtonPressed())
+            // 1. СОБЫТИЕ: Клик только что произошел (Нажатие кнопки)
+            // Захватываем объект ТОЛЬКО если мы никого не держим в данный момент
+            if (_inputManager.IsLButtonPressed() && _draggedObject == null)
             {
                 foreach (var obj in _gameObjects)
                 {
@@ -200,8 +201,7 @@ namespace VirtualFriend
                         {
                             _draggedObject = obj;
 
-                            // Тип тела НЕ МЕНЯЕМ, оставляем Dynamic!
-                            // Обнуляем текущую скорость, чтобы коробка послушно пошла за мышью
+                            // Обнуляем старые скорости, чтобы коробка мгновенно перешла под контроль
                             _draggedObject.PhysicsBody.LinearVelocity = Microsoft.Xna.Framework.Vector2.Zero;
                             _draggedObject.PhysicsBody.AngularVelocity = 0f;
                             break;
@@ -209,39 +209,45 @@ namespace VirtualFriend
                     }
                 }
             }
-
-            // СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание динамического тела)
-            if (_inputManager.IsLButtonDown() && _draggedObject != null)
+            // 2. СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
+            // Используем else if, чтобы бросок обрабатывался отдельно от удержания
+            else if (_inputManager.IsLButtonReleased() && _draggedObject != null)
             {
-                // Вычисляем вектор от центра коробки до курсора мыши
+                float launchModifier = 1.0f;
+
+                // Передаем финальное ускорение от броска руки
+                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
+                    _inputManager.MouseWorldVelocity.X * launchModifier,
+                    _inputManager.MouseWorldVelocity.Y * launchModifier
+                );
+
+                // СТРОГО ОБЯЗАТЕЛЬНО: зануляем ссылку, чтобы программа забыла про этот ящик
+                _draggedObject = null;
+            }
+            // 3. СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание)
+            // Выполняется ТОЛЬКО если кнопка зажата, объект выбран и мы его НЕ отпускаем в этом кадре
+            else if (_inputManager.IsLButtonDown() && _draggedObject != null)
+            {
+                // Вычисляем вектор расстояния до мыши
                 float targetX = currentMouseWorld.X - _draggedObject.PhysicsBody.Position.X;
                 float targetY = currentMouseWorld.Y - _draggedObject.PhysicsBody.Position.Y;
 
-                // Коэффициент отзывчивости (чем выше, тем жестче коробка привязана к мыши)
                 float responsiveness = 12f;
 
-                // Задаем коробке скорость в сторону мыши. 
-                // Она остается динамической, но активно стремится к курсору.
+                // Притягиваем ящик к курсору
                 _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
                     targetX * responsiveness,
                     targetY * responsiveness
                 );
             }
 
-            // СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
-            if (_inputManager.IsLButtonReleased() && _draggedObject != null)
+            // Дополнительная страховка: если физически кнопка мыши отпущена в Windows, 
+            // но игра пропустила событие IsLButtonReleased из-за потери фокуса
+            if (!_inputManager.IsLButtonDown() && _draggedObject != null)
             {
-                // Тип тела менять не нужно, оно и так Dynamic.
-                // Просто передаем накопленную скорость мыши из InputManager для эффекта броска!
-                float launchModifier = 1.0f;
-
-                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
-                    _inputManager.MouseWorldVelocity.X * launchModifier,
-                    _inputManager.MouseWorldVelocity.Y * launchModifier
-                );
-
-                _draggedObject = null; // Освобождаем объект
+                _draggedObject = null;
             }
+
 
         }
 
