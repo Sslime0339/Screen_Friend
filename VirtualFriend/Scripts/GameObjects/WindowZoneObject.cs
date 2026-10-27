@@ -109,7 +109,13 @@ namespace VirtualFriend.Scripts.GameObjects
 
         public override void Update(float dt)
         {
-            _localWorld.Step(dt);
+
+            // Если объект в процессе уничтожения, ничего не считаем
+            if (IsDestroyed || _localWorld == null) return;
+
+
+
+            _localWorld.Step(Math.Min(dt, 1f / 60f));
 
             foreach (var obj in _microObjects)
             {
