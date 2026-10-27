@@ -53,7 +53,7 @@ namespace VirtualFriend.Scripts
         public void Update()
         {
             // 1. Обновление координат мыши
-            if (WindowManager.GetCursorPos(out WindowManager.Point point))
+            if (Win32Native.GetCursorPos(out Win32Native.Point point))
             {
                 _lastMouseX = _mouseX;
                 _lastMouseY = _mouseY;
@@ -74,7 +74,7 @@ namespace VirtualFriend.Scripts
 
         public bool IsExitPressed()
         {
-            return (WindowManager.GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+            return (Win32Native.GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
         }
 
         /// <summary>
@@ -82,7 +82,7 @@ namespace VirtualFriend.Scripts
         /// </summary>
         public bool IsSpawnPressed()
         {
-            bool isDown = (WindowManager.GetAsyncKeyState(VK_C) & 0x8000) != 0;
+            bool isDown = (Win32Native.GetAsyncKeyState(VK_C) & 0x8000) != 0;
             bool pressed = isDown && !_wasCPressed;
             _wasCPressed = isDown; // Запоминаем состояние
             return pressed;
@@ -93,7 +93,7 @@ namespace VirtualFriend.Scripts
         /// </summary>
         public bool IsClearPressed()
         {
-            bool isDown = (WindowManager.GetAsyncKeyState(VK_X) & 0x8000) != 0;
+            bool isDown = (Win32Native.GetAsyncKeyState(VK_X) & 0x8000) != 0;
             bool pressed = isDown && !_wasXPressed;
             _wasXPressed = isDown;
             return pressed;
@@ -103,7 +103,7 @@ namespace VirtualFriend.Scripts
 
         public bool IsLButtonDown()
         {
-            return (WindowManager.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+            return (Win32Native.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
         }
 
         public bool IsLButtonPressed()
@@ -134,7 +134,7 @@ namespace VirtualFriend.Scripts
 
         public void ResetMousePosition()
         {
-            if (WindowManager.GetCursorPos(out WindowManager.Point point))
+            if (Win32Native.GetCursorPos(out Win32Native.Point point))
             {
                 _mouseX = point.X;
                 _mouseY = point.Y;

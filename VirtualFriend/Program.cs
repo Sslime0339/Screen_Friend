@@ -9,12 +9,14 @@
 using Raylib_cs;
 using VirtualFriend.Scripts;
 
+using SysVector = System.Numerics.Vector2;
 
 
 
 
 // подключаем другие прстранства имён
 using VirtualFriend.Scripts.GameObjects;
+using static VirtualFriend.Scripts.Win32Native;
 
 
 
@@ -25,14 +27,14 @@ namespace VirtualFriend
 {
     internal class Program
     {
-        private readonly WindowManager _windowManager;
-        private readonly PhysicsSystem _physicsSystem;
-        private readonly RenderEngine _renderEngine;
+        private static WindowManager _windowManager;
+        private static PhysicsSystem _physicsSystem;
+        private static RenderEngine _renderEngine;
 
 
 
-        private readonly List<GameObject> _gameObjects = new List<GameObject>();
-        private bool _isRunning = true;
+        private static readonly List<GameObject> _gameObjects = new List<GameObject>();
+        private static bool _isRunning = true;
 
 
         static void Main(string[] args)
@@ -47,8 +49,12 @@ namespace VirtualFriend
             );
 
 
-            int workAreaWidth = 1600;
-            int workAreaHeight = 860;
+
+            GetWorkAreaSize(out int workAreaWidth, out int workAreaHeight);
+            
+            GetScreenSize(out int screenWidth, out int screenHeight);
+
+
 
             Raylib.InitWindow(workAreaWidth, workAreaHeight, "Raylib-cs + Velcro Physics overlay");
             Raylib.SetTargetFPS(60);
@@ -56,7 +62,10 @@ namespace VirtualFriend
 
 
             const float ppm = 50f; // Pixels Per Meter
+
             _windowManager = new WindowManager(ppm);
+            _windowManager.StartScanning(workAreaWidth, workAreaHeight, screenWidth, screenHeight);
+
             _physicsSystem = new PhysicsSystem(new Microsoft.Xna.Framework.Vector2(0f, 19.6f)); // Гравитация
             _renderEngine = new RenderEngine(ppm);
 
@@ -106,5 +115,35 @@ namespace VirtualFriend
             Raylib.CloseWindow();
 
         }
+
+
+        private static void GetWorkAreaSize(out int workAreaWidth, out int workAreaHeight)
+        {
+
+            const int SPI_GETWORKAREA = 48; // Код для получения рабочей области
+
+            RECT workArea = new RECT();
+            SystemParametersInfo(SPI_GETWORKAREA, 0, ref workArea, 0);
+
+            // Вычисляем чистую высоту (Нижняя граница минус Верхняя граница)
+            workAreaHeight = workArea.Bottom - workArea.Top;
+            workAreaWidth = workArea.Right - workArea.Left;
+
+        }
+
+
+        private static void GetScreenSize(out int screenWidth, out int screenHeight)
+        {
+
+            // Константы для ширины и высоты главного экрана
+            const int SM_CXSCREEN = 0;
+            const int SM_CYSCREEN = 1;
+            // 1. Получаем размеры экрана ДО ИНИЦИАЛИЗАЦИИ Raylib
+            screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        }
+
+
     }
 }

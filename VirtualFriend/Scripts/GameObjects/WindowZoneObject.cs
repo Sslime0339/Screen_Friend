@@ -13,7 +13,7 @@ using SysVector = System.Numerics.Vector2;
 
 namespace VirtualFriend.Scripts.GameObjects
 {
-    internal class WindowZoneObject
+    internal class WindowZoneObject : GameObject
     {
         public float Width { get; private set; }
         public float Height { get; private set; }
@@ -25,7 +25,7 @@ namespace VirtualFriend.Scripts.GameObjects
         // Коллайдеры внутренних границ (чтобы объекты не вылетали из окна)
         private readonly List<Body> _innerWalls = new List<Body>();
 
-        public WindowZoneObject(World world, WindowData data)
+        public WindowZoneObject(World world, WindowManager.WindowData data)
         {
             Width = data.Width;
             Height = data.Height;

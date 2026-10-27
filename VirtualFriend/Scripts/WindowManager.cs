@@ -6,6 +6,18 @@ namespace VirtualFriend.Scripts
 {
     internal class WindowManager
     {
+
+
+        public struct WindowData
+        {
+            public float Width;
+            public float Height;
+            public float CenterX;
+            public float CenterY;
+        }
+
+
+
         private List<WindowData> _pendingWindows = new List<WindowData>();
         private readonly object _lock = new object();
         private bool _isRunning = true;
@@ -24,17 +36,17 @@ namespace VirtualFriend.Scripts
                 while (_isRunning)
                 {
                     List<WindowData> currentWindows = new List<WindowData>();
-                    EnumWindows((hWnd, lParam) =>
+                    Win32Native.EnumWindows((hWnd, lParam) =>
                     {
-                        if (!IsWindowVisible(hWnd)) return true;
+                        if (!Win32Native.IsWindowVisible(hWnd)) return true;
                         StringBuilder sb = new StringBuilder(256);
-                        GetWindowText(hWnd, sb, sb.Capacity);
+                        Win32Native.GetWindowText(hWnd, sb, sb.Capacity);
                         if (string.IsNullOrWhiteSpace(sb.ToString())) return true;
 
-                        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                        Win32Native.DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
                         if (isCloaked) return true;
 
-                        if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+                        if (!Win32Native.GetExactWindowRect(hWnd, out Win32Native.RECT rect)) return true;
 
                         int width = rect.Right - rect.Left;
                         int height = rect.Bottom - rect.Top;
@@ -42,7 +54,7 @@ namespace VirtualFriend.Scripts
 
                         if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
                         {
-                            if (!IsZoomed(hWnd) && !IsIconic(hWnd))
+                            if (!Win32Native.IsZoomed(hWnd) && !Win32Native.IsIconic(hWnd))
                             {
                                 currentWindows.Add(new WindowData
                                 {

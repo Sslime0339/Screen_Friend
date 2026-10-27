@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Raylib_cs;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
-
-using Raylib_cs;
+using Font = Raylib_cs.Font;
 using SysVector = System.Numerics.Vector2;
 
 
@@ -48,9 +48,24 @@ namespace VirtualFriend.Scripts
             // Логика отрисовки Raylib.DrawTexturePro с текстурой ящика
         }
 
-        public void DrawTextWithShadow(string text, SysVector pos, float size, Color color)
+        public void DrawTextWithShadow(string text, SysVector position, float fontSize, Color textColor)
         {
-            // Ваша функция DrawTextExWithShadow
+            int offset = 2;
+            int spacing = 2;
+            Color shadowColor = new Color(0, 0, 0, 0);
+            // 1. Рисуем тень
+            //Raylib.DrawTextEx(font, text, position + offset, fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X + offset, position.Y), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X - offset, position.Y), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X, position.Y + offset), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X, position.Y - offset), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X + offset, position.Y + offset), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X - offset, position.Y + offset), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X + offset, position.Y - offset), fontSize, spacing, shadowColor);
+            Raylib.DrawTextEx(_myFont, text, new SysVector(position.X - offset, position.Y - offset), fontSize, spacing, shadowColor);
+
+            // 2. Рисуем основной текст
+            Raylib.DrawTextEx(_myFont, text, position, fontSize, spacing, textColor);
         }
     }
 }

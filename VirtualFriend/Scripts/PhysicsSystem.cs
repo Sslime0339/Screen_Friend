@@ -24,7 +24,7 @@ namespace VirtualFriend.Scripts
             World = new World(gravity);
         }
 
-        public void UpdateWindowsColliders(List<WindowData> windows)
+        public void UpdateWindowsColliders(List<WindowManager.WindowData> windows)
         {
             // Очищаем старые физические границы окон ОС
             foreach (var oldCollider in _windowColliders)
