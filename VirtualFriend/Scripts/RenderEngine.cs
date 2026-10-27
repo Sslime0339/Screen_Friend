@@ -47,6 +47,11 @@ namespace VirtualFriend.Scripts
         {
             // Логика отрисовки Raylib.DrawTexturePro с текстурой ящика
         }
+        public void DrawTexturePro(Texture2D texture, Rectangle rec, Rectangle destRec, SysVector origin, float rotation, Color color)
+        {
+            Raylib.DrawTexturePro(texture, rec, destRec, origin, rotation, color);
+        }
+
 
         public void DrawTextWithShadow(string text, SysVector position, float fontSize, Color textColor)
         {

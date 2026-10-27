@@ -106,7 +106,7 @@ namespace VirtualFriend
                 _renderEngine.End();
 
 
-                if (Raylib.WindowShouldClose()) _isRunning = false;
+                if (Raylib.WindowShouldClose() || InputManager.IsExitPressed()) _isRunning = false;
             }
 
 
