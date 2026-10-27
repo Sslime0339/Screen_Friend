@@ -38,8 +38,9 @@ namespace VirtualFriend.Scripts.GameObjects
             // Задаем размеры вывода на экране
             Rectangle destRec = new Rectangle(PhysicsBody.Position.X, PhysicsBody.Position.Y, _size, _size);
             SysVector origin = new SysVector(_size / 2f, _size / 2f);
-
-            SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, (int)Math.Abs((rotationInDegrees + 360) % 360));
+            
+            int textureId = (int)((rotationInDegrees % 360 + 360) % 360);
+            SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, textureId);
 
             //Console.WriteLine((int)rotationInDegrees);
             //Console.WriteLine(currentFrame.Texture.Height);

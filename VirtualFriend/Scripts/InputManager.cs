@@ -1,14 +1,8 @@
-﻿using Raylib_cs;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
-using VirtualFriend.Scripts.GameObjects;
+using Raylib_cs;
 using SysVector = System.Numerics.Vector2;
-
-
-
-
 
 namespace VirtualFriend.Scripts
 {
@@ -16,30 +10,26 @@ namespace VirtualFriend.Scripts
     {
         private readonly RenderEngine _renderEngine;
 
-        // Коды клавиш WinAPI
         private const int VK_ESCAPE = 0x1B;
         private const int VK_C = 0x43;
         private const int VK_X = 0x58;
         private const int VK_LBUTTON = 0x01;
 
-        // Состояния кнопок для эмуляции одиночного нажатия (Pressed)
         private bool _wasCPressed = false;
         private bool _wasXPressed = false;
         private bool _wasLButtonPressed = false;
 
-        // Данные мыши
         private int _mouseX;
         private int _mouseY;
-        private int _lastMouseX;
-        private int _lastMouseY;
-        private long _lastMoveTimestamp;
 
-        // Свойства для получения текущего состояния мыши
+        // Вектор скорости мыши в мировых координатах (метров в секунду)
+        private SysVector _mouseWorldVelocity = SysVector.Zero;
+
         public int MouseX => _mouseX;
         public int MouseY => _mouseY;
-        public int LastMouseX => _lastMouseX;
-        public int LastMouseY => _lastMouseY;
-        public long LastMoveTimestamp => _lastMoveTimestamp;
+
+        // Свойство для получения актуальной скорости броска
+        public SysVector MouseWorldVelocity => _mouseWorldVelocity;
 
         public InputManager(RenderEngine renderEngine)
         {
@@ -47,42 +37,41 @@ namespace VirtualFriend.Scripts
             ResetMousePosition();
         }
 
-        /// <summary>
-        /// Обновляет состояния всех клавиш и мыши. Должен вызываться КАЖДЫЙ кадр.
-        /// </summary>
-        public void Update(List<GameObject> gameObjects)
+        public void Update(List<GameObjects.GameObject> gameObjects, float dt)
         {
+            // Сохраняем предыдущую позицию в метрах перед обновлением
+            SysVector previousMouseWorld = GetMouseWorldPosition();
+
             // 1. Обновление координат мыши
             if (Win32Native.GetCursorPos(out Win32Native.Point point))
             {
-                _lastMouseX = _mouseX;
-                _lastMouseY = _mouseY;
                 _mouseX = point.X;
                 _mouseY = point.Y;
-
-                if (_mouseX != _lastMouseX || _mouseY != _lastMouseY)
-                {
-                    _lastMoveTimestamp = Stopwatch.GetTimestamp();
-                }
-
             }
 
-            // 2. Логика динамического клика насквозь (из старого проекта)
-            bool isHoveringBox = false;
-            SysVector mouseWorldPos = GetMouseWorldPosition();
+            SysVector currentMouseWorld = GetMouseWorldPosition();
 
+            // 2. Считаем мгновенную скорость мыши (изменение позиции / время кадра)
+            if (dt > 0)
+            {
+                _mouseWorldVelocity = (currentMouseWorld - previousMouseWorld) / dt;
+            }
+            else
+            {
+                _mouseWorldVelocity = SysVector.Zero;
+            }
+
+            // 3. Логика динамического клика насквозь
+            bool isHoveringBox = false;
             foreach (var obj in gameObjects)
             {
-                // Проверяем только физические тела, у которых есть PhysicsBody
                 if (obj.PhysicsBody != null && !obj.IsDestroyed)
                 {
-                    // Здесь мы используем фиксированный размер ящика (например, 1.0f или 1.2f в метрах)
-                    // Если у вас размер ящика хранится внутри BoxObject, можно сделать свойство AABB или Size.
                     float halfSize = 1.0f / 2f;
                     var pos = obj.PhysicsBody.Position;
 
-                    if (mouseWorldPos.X >= pos.X - halfSize && mouseWorldPos.X <= pos.X + halfSize &&
-                        mouseWorldPos.Y >= pos.Y - halfSize && mouseWorldPos.Y <= pos.Y + halfSize)
+                    if (currentMouseWorld.X >= pos.X - halfSize && currentMouseWorld.X <= pos.X + halfSize &&
+                        currentMouseWorld.Y >= pos.Y - halfSize && currentMouseWorld.Y <= pos.Y + halfSize)
                     {
                         isHoveringBox = true;
                         break;
@@ -90,15 +79,12 @@ namespace VirtualFriend.Scripts
                 }
             }
 
-
-            // Если мышь над коробкой — окно улавливает клики. Иначе — пропускает сквозь себя в ОС.
             if (isHoveringBox)
             {
                 Raylib.ClearWindowState(ConfigFlags.MousePassthroughWindow);
             }
             else
             {
-                // Если кнопка уже удерживается, не включаем passthrough, чтобы не потерять фокус во время перетаскивания
                 if (!IsLButtonDown())
                 {
                     Raylib.SetWindowState(ConfigFlags.MousePassthroughWindow);
@@ -106,27 +92,16 @@ namespace VirtualFriend.Scripts
             }
         }
 
-        // --- МЕТОДЫ-СОБЫТИЯ ДЛЯ КЛАВИШ ---
+        public bool IsExitPressed() => (Win32Native.GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
 
-        public bool IsExitPressed()
-        {
-            return (Win32Native.GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
-        }
-
-        /// <summary>
-        /// Возвращает true только в первый кадр нажатия клавиши 'C' (Аналог IsKeyPressed)
-        /// </summary>
         public bool IsSpawnPressed()
         {
             bool isDown = (Win32Native.GetAsyncKeyState(VK_C) & 0x8000) != 0;
             bool pressed = isDown && !_wasCPressed;
-            _wasCPressed = isDown; // Запоминаем состояние
+            _wasCPressed = isDown;
             return pressed;
         }
 
-        /// <summary>
-        /// Возвращает true только в первый кадр нажатия клавиши 'X'
-        /// </summary>
         public bool IsClearPressed()
         {
             bool isDown = (Win32Native.GetAsyncKeyState(VK_X) & 0x8000) != 0;
@@ -135,12 +110,7 @@ namespace VirtualFriend.Scripts
             return pressed;
         }
 
-        // --- МЕТОДЫ ДЛЯ ЛЕВОЙ КНОПКИ МЫШИ (ДЛЯ КОНТРОЛЛЕРА ЗАХВАТА) ---
-
-        public bool IsLButtonDown()
-        {
-            return (Win32Native.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-        }
+        public bool IsLButtonDown() => (Win32Native.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 
         public bool IsLButtonPressed()
         {
@@ -158,11 +128,6 @@ namespace VirtualFriend.Scripts
             return released;
         }
 
-        // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
-
-        /// <summary>
-        /// Возвращает позицию мыши, автоматически переведенную в метры физического мира
-        /// </summary>
         public SysVector GetMouseWorldPosition()
         {
             return Raylib.GetScreenToWorld2D(new SysVector(_mouseX, _mouseY), _renderEngine.Camera);
@@ -174,8 +139,6 @@ namespace VirtualFriend.Scripts
             {
                 _mouseX = point.X;
                 _mouseY = point.Y;
-                _lastMouseX = point.X;
-                _lastMouseY = point.Y;
             }
         }
     }

@@ -87,7 +87,7 @@ namespace VirtualFriend
                 float dt = Raylib.GetFrameTime();
 
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
-                _inputManager.Update(_gameObjects);
+                _inputManager.Update(_gameObjects, dt);
 
                 // --- Логика управления ящиками ---
                 HandleInput();
@@ -200,8 +200,8 @@ namespace VirtualFriend
                         {
                             _draggedObject = obj;
 
-                            // Переводим тело в кинематическое состояние, чтобы на него не влияла гравитация
-                            _draggedObject.PhysicsBody.BodyType = Genbox.VelcroPhysics.Dynamics.BodyType.Kinematic;
+                            // Тип тела НЕ МЕНЯЕМ, оставляем Dynamic!
+                            // Обнуляем текущую скорость, чтобы коробка послушно пошла за мышью
                             _draggedObject.PhysicsBody.LinearVelocity = Microsoft.Xna.Framework.Vector2.Zero;
                             _draggedObject.PhysicsBody.AngularVelocity = 0f;
                             break;
@@ -210,43 +210,39 @@ namespace VirtualFriend
                 }
             }
 
-            // СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание)
+            // СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание динамического тела)
             if (_inputManager.IsLButtonDown() && _draggedObject != null)
             {
-                // Просто привязываем позицию физического тела к координатам курсора
-                _draggedObject.PhysicsBody.Position = new Microsoft.Xna.Framework.Vector2(currentMouseWorld.X, currentMouseWorld.Y);
+                // Вычисляем вектор от центра коробки до курсора мыши
+                float targetX = currentMouseWorld.X - _draggedObject.PhysicsBody.Position.X;
+                float targetY = currentMouseWorld.Y - _draggedObject.PhysicsBody.Position.Y;
+
+                // Коэффициент отзывчивости (чем выше, тем жестче коробка привязана к мыши)
+                float responsiveness = 12f;
+
+                // Задаем коробке скорость в сторону мыши. 
+                // Она остается динамической, но активно стремится к курсору.
+                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
+                    targetX * responsiveness,
+                    targetY * responsiveness
+                );
             }
 
             // СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
             if (_inputManager.IsLButtonReleased() && _draggedObject != null)
             {
-                float throwForceX = 0f;
-                float throwForceY = 0f;
+                // Тип тела менять не нужно, оно и так Dynamic.
+                // Просто передаем накопленную скорость мыши из InputManager для эффекта броска!
+                float launchModifier = 1.0f;
 
-                long currentTimestamp = Stopwatch.GetTimestamp();
-                long elapsedTicks = currentTimestamp - _inputManager.LastMoveTimestamp;
-                double elapsedMilliseconds = (double)elapsedTicks / Stopwatch.Frequency * 1000;
-
-                // Если мышка двигалась недавно (меньше 50 мс назад), рассчитываем вектор броска
-                if (elapsedMilliseconds < 50)
-                {
-                    // Переводим прошлую позицию мыши в координаты мира
-                    SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(
-                        new SysVector(_inputManager.LastMouseX, _inputManager.LastMouseY),
-                        _renderEngine.Camera
-                    );
-
-                    // Вычисляем силу броска на основе разницы координат (множитель 35f взят из старого проекта)
-                    throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
-                    throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
-                }
-
-                // Возвращаем коробке динамический тип физики и придаем ускорение
-                _draggedObject.PhysicsBody.BodyType = Genbox.VelcroPhysics.Dynamics.BodyType.Dynamic;
-                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(throwForceX, throwForceY);
+                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
+                    _inputManager.MouseWorldVelocity.X * launchModifier,
+                    _inputManager.MouseWorldVelocity.Y * launchModifier
+                );
 
                 _draggedObject = null; // Освобождаем объект
             }
+
         }
 
 
