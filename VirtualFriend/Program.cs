@@ -9,6 +9,7 @@
 using Genbox.VelcroPhysics.Dynamics;
 using Genbox.VelcroPhysics.Factories;
 using Raylib_cs;
+using System.Diagnostics;
 using VirtualFriend.Scripts;
 // подключаем другие прстранства имён
 using VirtualFriend.Scripts.GameObjects;
@@ -35,6 +36,10 @@ namespace VirtualFriend
 
         private static readonly List<GameObject> _gameObjects = new List<GameObject>();
         private static bool _isRunning = true;
+
+
+
+        private static GameObject _draggedObject = null;
 
 
         static void Main(string[] args)
@@ -82,7 +87,7 @@ namespace VirtualFriend
                 float dt = Raylib.GetFrameTime();
 
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
-                _inputManager.Update();
+                _inputManager.Update(_gameObjects);
 
                 // --- Логика управления ящиками ---
                 HandleInput();
@@ -156,34 +161,91 @@ namespace VirtualFriend
 
         private static void HandleInput()
         {
-            // 1. Создание ящика по нажатию клавиши 'C'
+            // --- 1. Создание ящика (Клавиша C) ---
             if (_inputManager.IsSpawnPressed())
             {
-                // Получаем позицию мыши, переведенную в метры физического мира
-                System.Numerics.Vector2 mouseWorldPos = _inputManager.GetMouseWorldPosition();
-
-                // Задаем размер коробки (например, 1.0 метра в физическом мире)
+                SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
                 float boxSize = 1.0f;
-
-                // Создаем коробку в физическом мире Velcro
                 BoxObject newBox = new BoxObject(_physicsSystem.World, mouseWorldPos, boxSize);
-
-                // Добавляем в общий список для обновлений и отрисовки
                 _gameObjects.Add(newBox);
             }
 
-            // 2. Очистка всех ящиков по нажатию клавиши 'X'
+            // --- 2. Очистка сцены (Клавиша X) ---
             if (_inputManager.IsClearPressed())
             {
                 foreach (var obj in _gameObjects)
                 {
-                    // Метод Destroy удалит физическое тело из _physicsSystem.World
                     obj.Destroy(_physicsSystem.World);
                 }
-
-                // Список очистится сам на следующей итерации цикла благодаря проверке IsDestroyed,
-                // либо можно принудительно очистить его здесь:
                 _gameObjects.Clear();
+                _draggedObject = null; // Сбрасываем захват при очистке
+            }
+
+            // --- 3. ХВАТАНИЕ И ПЕРЕТАСКИВАНИЕ (Левая кнопка мыши) ---
+            SysVector currentMouseWorld = _inputManager.GetMouseWorldPosition();
+
+            // СОБЫТИЕ: Клик только что произошел (Нажатие)
+            if (_inputManager.IsLButtonPressed())
+            {
+                foreach (var obj in _gameObjects)
+                {
+                    if (obj.PhysicsBody != null && !obj.IsDestroyed)
+                    {
+                        float halfSize = 1.0f / 2f; // Половина размера коробки в метрах
+                        var pos = obj.PhysicsBody.Position;
+
+                        // Проверяем, попал ли курсор в границы коробки
+                        if (currentMouseWorld.X >= pos.X - halfSize && currentMouseWorld.X <= pos.X + halfSize &&
+                            currentMouseWorld.Y >= pos.Y - halfSize && currentMouseWorld.Y <= pos.Y + halfSize)
+                        {
+                            _draggedObject = obj;
+
+                            // Переводим тело в кинематическое состояние, чтобы на него не влияла гравитация
+                            _draggedObject.PhysicsBody.BodyType = Genbox.VelcroPhysics.Dynamics.BodyType.Kinematic;
+                            _draggedObject.PhysicsBody.LinearVelocity = Microsoft.Xna.Framework.Vector2.Zero;
+                            _draggedObject.PhysicsBody.AngularVelocity = 0f;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание)
+            if (_inputManager.IsLButtonDown() && _draggedObject != null)
+            {
+                // Просто привязываем позицию физического тела к координатам курсора
+                _draggedObject.PhysicsBody.Position = new Microsoft.Xna.Framework.Vector2(currentMouseWorld.X, currentMouseWorld.Y);
+            }
+
+            // СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
+            if (_inputManager.IsLButtonReleased() && _draggedObject != null)
+            {
+                float throwForceX = 0f;
+                float throwForceY = 0f;
+
+                long currentTimestamp = Stopwatch.GetTimestamp();
+                long elapsedTicks = currentTimestamp - _inputManager.LastMoveTimestamp;
+                double elapsedMilliseconds = (double)elapsedTicks / Stopwatch.Frequency * 1000;
+
+                // Если мышка двигалась недавно (меньше 50 мс назад), рассчитываем вектор броска
+                if (elapsedMilliseconds < 50)
+                {
+                    // Переводим прошлую позицию мыши в координаты мира
+                    SysVector lastMouseWorld = Raylib.GetScreenToWorld2D(
+                        new SysVector(_inputManager.LastMouseX, _inputManager.LastMouseY),
+                        _renderEngine.Camera
+                    );
+
+                    // Вычисляем силу броска на основе разницы координат (множитель 35f взят из старого проекта)
+                    throwForceX = (currentMouseWorld.X - lastMouseWorld.X) * 35f;
+                    throwForceY = (currentMouseWorld.Y - lastMouseWorld.Y) * 35f;
+                }
+
+                // Возвращаем коробке динамический тип физики и придаем ускорение
+                _draggedObject.PhysicsBody.BodyType = Genbox.VelcroPhysics.Dynamics.BodyType.Dynamic;
+                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(throwForceX, throwForceY);
+
+                _draggedObject = null; // Освобождаем объект
             }
         }
 

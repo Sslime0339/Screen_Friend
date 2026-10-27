@@ -39,7 +39,7 @@ namespace VirtualFriend.Scripts.GameObjects
             Rectangle destRec = new Rectangle(PhysicsBody.Position.X, PhysicsBody.Position.Y, _size, _size);
             SysVector origin = new SysVector(_size / 2f, _size / 2f);
 
-            SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, (int)rotationInDegrees);
+            SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, (int)Math.Abs((rotationInDegrees + 360) % 360));
 
             //Console.WriteLine((int)rotationInDegrees);
             //Console.WriteLine(currentFrame.Texture.Height);
@@ -54,7 +54,8 @@ namespace VirtualFriend.Scripts.GameObjects
                 currentFrame.SourceRec,
                 destRec,
                 origin,
-                rotationInDegrees,
+                0,
+                //rotationInDegrees,
                 Color.White
             );
         }

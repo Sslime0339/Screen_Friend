@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Raylib_cs;
+using System;
 using System.Collections.Generic;
-using System.Text;
-
 using System.Diagnostics;
-using Raylib_cs;
+using System.Text;
+using VirtualFriend.Scripts.GameObjects;
 using SysVector = System.Numerics.Vector2;
 
 
@@ -50,7 +50,7 @@ namespace VirtualFriend.Scripts
         /// <summary>
         /// Обновляет состояния всех клавиш и мыши. Должен вызываться КАЖДЫЙ кадр.
         /// </summary>
-        public void Update()
+        public void Update(List<GameObject> gameObjects)
         {
             // 1. Обновление координат мыши
             if (Win32Native.GetCursorPos(out Win32Native.Point point))
@@ -64,10 +64,46 @@ namespace VirtualFriend.Scripts
                 {
                     _lastMoveTimestamp = Stopwatch.GetTimestamp();
                 }
+
             }
 
-            // 2. Фиксация предыдущих состояний клавиш перед опросом новых
-            // (Это нужно для корректной работы методов вроде IsSpawnPressed)
+            // 2. Логика динамического клика насквозь (из старого проекта)
+            bool isHoveringBox = false;
+            SysVector mouseWorldPos = GetMouseWorldPosition();
+
+            foreach (var obj in gameObjects)
+            {
+                // Проверяем только физические тела, у которых есть PhysicsBody
+                if (obj.PhysicsBody != null && !obj.IsDestroyed)
+                {
+                    // Здесь мы используем фиксированный размер ящика (например, 1.0f или 1.2f в метрах)
+                    // Если у вас размер ящика хранится внутри BoxObject, можно сделать свойство AABB или Size.
+                    float halfSize = 1.0f / 2f;
+                    var pos = obj.PhysicsBody.Position;
+
+                    if (mouseWorldPos.X >= pos.X - halfSize && mouseWorldPos.X <= pos.X + halfSize &&
+                        mouseWorldPos.Y >= pos.Y - halfSize && mouseWorldPos.Y <= pos.Y + halfSize)
+                    {
+                        isHoveringBox = true;
+                        break;
+                    }
+                }
+            }
+
+
+            // Если мышь над коробкой — окно улавливает клики. Иначе — пропускает сквозь себя в ОС.
+            if (isHoveringBox)
+            {
+                Raylib.ClearWindowState(ConfigFlags.MousePassthroughWindow);
+            }
+            else
+            {
+                // Если кнопка уже удерживается, не включаем passthrough, чтобы не потерять фокус во время перетаскивания
+                if (!IsLButtonDown())
+                {
+                    Raylib.SetWindowState(ConfigFlags.MousePassthroughWindow);
+                }
+            }
         }
 
         // --- МЕТОДЫ-СОБЫТИЯ ДЛЯ КЛАВИШ ---
