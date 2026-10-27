@@ -1,31 +1,81 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
+using System.Runtime.InteropServices;
+using Genbox.VelcroPhysics.Dynamics;
+using VirtualFriend.Scripts.GameObjects;
 
 namespace VirtualFriend.Scripts
 {
     internal class WindowManager
     {
-
+        // Хранилище активных игровых объектов окон
+        private readonly List<WindowZoneObject> _activeWindowObjects = new List<WindowZoneObject>();
+        private readonly World _physicsWorld;
+        private readonly float _pixelsPerMeter;
 
         public struct WindowData
         {
+            public IntPtr Hwnd; // Добавлено для связи с Win32 API
             public float Width;
             public float Height;
             public float CenterX;
             public float CenterY;
         }
 
-
-
         private List<WindowData> _pendingWindows = new List<WindowData>();
         private readonly object _lock = new object();
         private bool _isRunning = true;
-        private readonly float _pixelsPerMeter;
 
-        public WindowManager(float pixelsPerMeter)
+        public WindowManager(World physicsWorld, float pixelsPerMeter)
         {
+            _physicsWorld = physicsWorld;
             _pixelsPerMeter = pixelsPerMeter;
+        }
+
+        // --- Метод для управления положением окна из Win32 ---
+        public bool ResizeAndMoveWindow(IntPtr hWnd, int x, int y, int width, int height)
+        {
+            const uint SWP_NOZORDER = 0x0004;
+            const uint SWP_NOACTIVATE = 0x0010;
+
+            // Вызов Win32 API функции SetWindowPos
+            return SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+
+        // Обновление состояния: создание, актуализация и удаление игровых объектов окон
+        public void Update()
+        {
+            List<WindowData> snapshot = GetWindowsSnapshot();
+
+            // 1. Удаляем закрытые окна
+            for (int i = _activeWindowObjects.Count - 1; i >= 0; i--)
+            {
+                var activeWin = _activeWindowObjects[i];
+                if (!snapshot.Exists(w => w.Hwnd == activeWin.Hwnd))
+                {
+                    activeWin.Destroy(_physicsWorld);
+                    _activeWindowObjects.RemoveAt(i);
+                }
+            }
+
+            // 2. Создаем новые или обновляем существующие
+            foreach (var data in snapshot)
+            {
+                var existingWindow = _activeWindowObjects.Find(w => w.Hwnd == data.Hwnd);
+                if (existingWindow == null)
+                {
+                    // Создаем новый объект окна и сохраняем его в список
+                    var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data);
+                    _activeWindowObjects.Add(newWindowObj);
+                }
+                else
+                {
+                    // Если окно уже есть — обновляем его параметры в игровом движке
+                    existingWindow.UpdatePositionAndSize(data);
+                }
+            }
         }
 
         public void StartScanning(int workAreaWidth, int workAreaHeight, int screenWidth, int screenHeight)
@@ -58,6 +108,7 @@ namespace VirtualFriend.Scripts
                             {
                                 currentWindows.Add(new WindowData
                                 {
+                                    Hwnd = hWnd, // Сохраняем хэндл окна
                                     Width = width / _pixelsPerMeter,
                                     Height = height / _pixelsPerMeter,
                                     CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,
@@ -81,6 +132,8 @@ namespace VirtualFriend.Scripts
 
         public void Stop() => _isRunning = false;
 
-        // Сюда переносятся все DllImport (EnumWindows, GetWindowText, DwmGetWindowAttribute и т.д.) из вашего старого кода
+        // Импорт функции Win32 API для изменения размеров/позиции
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     }
 }

@@ -20,6 +20,7 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.BodyType = BodyType.Dynamic;
             PhysicsBody.Restitution = 0.2f;
             PhysicsBody.Friction = 0.6f;
+
         }
 
         public override void Update(float dt)
@@ -46,7 +47,7 @@ namespace VirtualFriend.Scripts.GameObjects
             //Console.WriteLine(currentFrame.Texture.Height);
 
 
-            renderer.DrawBox(destRec.Position, (int)_size, (int)_size, origin, rotationInDegrees, Color.Lime);
+            renderer.DrawBox(destRec.Position, _size, _size, origin, rotationInDegrees, Color.Lime);
 
             // Отрисовка через ваш RenderEngine (или напрямую через Raylib)
             // Используем SourceRec нашего кадра вместо всей текстуры!

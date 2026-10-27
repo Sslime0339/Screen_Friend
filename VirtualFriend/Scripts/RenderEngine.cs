@@ -43,7 +43,7 @@ namespace VirtualFriend.Scripts
         public void EndWorldSpace() => Raylib.EndMode2D();
         public void End() => Raylib.EndDrawing();
 
-        public void DrawBox(SysVector position, int width, int height, SysVector origin, float rotation, Color color)
+        public void DrawBox(SysVector position, float width, float height, SysVector origin, float rotation, Color color)
         {
             //SysVector origin = new SysVector(0, 0);
             

@@ -67,18 +67,26 @@ namespace VirtualFriend
 
             const float ppm = 50f; // Pixels Per Meter
 
-            _windowManager = new WindowManager(ppm);
-            _windowManager.StartScanning(workAreaWidth, workAreaHeight, screenWidth, screenHeight);
 
             _physicsSystem = new PhysicsSystem(new Microsoft.Xna.Framework.Vector2(0f, 19.6f)); // Гравитация
             _renderEngine = new RenderEngine(ppm);
             InitWalls(ppm);
 
+
+            GameObjectFactory.Initialize(_gameObjects);
+
+
+            _windowManager = new WindowManager(_physicsSystem.World, ppm);
+            _windowManager.StartScanning(workAreaWidth, workAreaHeight, screenWidth, screenHeight);
+
+
             _inputManager = new InputManager(_renderEngine);
+
 
             _resourceManager = new ResourceManager();
             _resourceManager.LoadSpriteSheet(Assets.Sheets.Box, "Assets/Textures/box_sheet.png", 128, 128);
             _resourceManager.LoadFont(Assets.Fonts.MainFont, "Assets/Fonts/arial.ttf");
+
 
 
             while (_isRunning)
@@ -99,6 +107,7 @@ namespace VirtualFriend
                     if (_gameObjects[i].IsDestroyed) _gameObjects.RemoveAt(i);
                 }
 
+                _windowManager.Update();
 
                 // Шаг физического мира
                 _physicsSystem.Step(dt);
@@ -166,7 +175,7 @@ namespace VirtualFriend
             {
                 SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
                 float boxSize = 1.0f;
-                BoxObject newBox = new BoxObject(_physicsSystem.World, mouseWorldPos, boxSize);
+                BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
                 _gameObjects.Add(newBox);
             }
 
