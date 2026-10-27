@@ -12,10 +12,6 @@ namespace VirtualFriend.Scripts.GameObjects
         private readonly float _size;
         private int _animFrame = 0;
 
-        private int _currentFrame = 0;
-        private float _timeCount = 0f;
-        private float _frameDuration = 0.05f; // Скорость анимации
-        private float _sizeMeters = 1.2f;
 
         public BoxObject(World world, SysVector spawnPos, float size)
         {
@@ -31,10 +27,9 @@ namespace VirtualFriend.Scripts.GameObjects
             // Здесь можно обновлять кадры анимации конкретно этой коробки
         }
 
-        public override void Draw(RenderEngine renderer)
+        public override void Draw(RenderEngine renderer, ResourceManager resourceManager)
         {
             if (IsDestroyed) return;
-
 
 
 
@@ -44,8 +39,13 @@ namespace VirtualFriend.Scripts.GameObjects
             Rectangle destRec = new Rectangle(PhysicsBody.Position.X, PhysicsBody.Position.Y, _size, _size);
             SysVector origin = new SysVector(_size / 2f, _size / 2f);
 
-            SpriteFrame currentFrame = ResourceManager.GetSpriteFrame(Assets.Sheets.Box, (int)rotationInDegrees);
+            SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, (int)rotationInDegrees);
 
+            //Console.WriteLine((int)rotationInDegrees);
+            //Console.WriteLine(currentFrame.Texture.Height);
+
+
+            renderer.DrawBox(destRec.Position, (int)_size, (int)_size, origin, rotationInDegrees, Color.Lime);
 
             // Отрисовка через ваш RenderEngine (или напрямую через Raylib)
             // Используем SourceRec нашего кадра вместо всей текстуры!

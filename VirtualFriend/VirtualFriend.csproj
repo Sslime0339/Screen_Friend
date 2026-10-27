@@ -12,4 +12,16 @@
     <PackageReference Include="Raylib-cs" Version="8.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Assets\Fonts\arial.ttf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Textures\box.gif">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Textures\box_sheet.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

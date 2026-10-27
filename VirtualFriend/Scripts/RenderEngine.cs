@@ -43,9 +43,28 @@ namespace VirtualFriend.Scripts
         public void EndWorldSpace() => Raylib.EndMode2D();
         public void End() => Raylib.EndDrawing();
 
-        public void DrawBox(SysVector position, float size, float rotation, int currentFrame)
+        public void DrawBox(SysVector position, int width, int height, SysVector origin, float rotation, Color color)
         {
-            // Логика отрисовки Raylib.DrawTexturePro с текстурой ящика
+            //SysVector origin = new SysVector(0, 0);
+            
+            // Отрисовка вращающегося квадрата
+            Raylib.DrawRectanglePro(
+                new Rectangle(position.X, position.Y, width, height),
+                origin,
+                rotation,
+                Color.Red
+            );
+
+            /*
+            float rotationInDegrees = box.Rotation * (180f / (float)Math.PI);
+            Rectangle destRec = new Rectangle(box.Position.X, box.Position.Y, BoxSizeMeters, BoxSizeMeters);
+            SysVector origin = new SysVector(BoxSizeMeters / 2f, BoxSizeMeters / 2f);
+            Raylib.DrawTexturePro(texBoxAnim[currentAnimFrame], sourceRec, destRec, origin, rotationInDegrees, Color.White);
+
+            var rect = new Rectangle(posX, posY, width, height);
+
+            Raylib.DrawRectangleRec(rect, new Color(10, 20, 255, 60));
+            //Raylib.DrawRectangle(posX, posY, width, height, color);*/
         }
         public void DrawTexturePro(Texture2D texture, Rectangle rec, Rectangle destRec, SysVector origin, float rotation, Color color)
         {

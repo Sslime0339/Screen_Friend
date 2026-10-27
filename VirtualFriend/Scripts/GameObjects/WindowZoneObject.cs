@@ -74,7 +74,7 @@ namespace VirtualFriend.Scripts.GameObjects
             }
         }
 
-        public override void Draw(RenderEngine renderer)
+        public override void Draw(RenderEngine renderer, ResourceManager resourceManager)
         {
 #if DEBUG
             // Рисуем границы самого окна ОС
@@ -85,7 +85,7 @@ namespace VirtualFriend.Scripts.GameObjects
             // Отрисовываем уникальное содержимое этого окна
             foreach (var obj in _microObjects)
             {
-                obj.Draw(renderer);
+                obj.Draw(renderer, resourceManager);
             }
         }
 

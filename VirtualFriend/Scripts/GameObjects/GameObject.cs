@@ -15,7 +15,7 @@ namespace VirtualFriend.Scripts.GameObjects
         public bool IsDestroyed { get; protected set; }
 
         public abstract void Update(float dt);
-        public abstract void Draw(RenderEngine renderer);
+        public abstract void Draw(RenderEngine renderer, ResourceManager resourceManager);
 
         public virtual void Destroy(World world)
         {

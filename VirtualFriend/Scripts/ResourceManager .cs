@@ -9,23 +9,23 @@ using Raylib_cs;
 
 namespace VirtualFriend.Scripts
 {
-    internal static class ResourceManager
+    internal class ResourceManager
     {
 
 
-        private static readonly Dictionary<string, Texture2D> _textures = new Dictionary<string, Texture2D>();
-        private static readonly Dictionary<string, SpriteSheet> _spriteSheets = new Dictionary<string, SpriteSheet>();
-        private static readonly Dictionary<string, Font> _fonts = new Dictionary<string, Font>();
+        private readonly Dictionary<string, Texture2D> _textures = new Dictionary<string, Texture2D>();
+        private readonly Dictionary<string, SpriteSheet> _spriteSheets = new Dictionary<string, SpriteSheet>();
+        private readonly Dictionary<string, Font> _fonts = new Dictionary<string, Font>();
 
         // Загрузка одиночной текстуры
-        public static void LoadTexture(string id, string filePath)
+        public void LoadTexture(string id, string filePath)
         {
             if (_textures.ContainsKey(id)) return;
             _textures[id] = Raylib.LoadTexture(filePath);
         }
 
         // Загрузка спрайт-листа с автоматической нарезкой на кадры
-        public static void LoadSpriteSheet(string id, string filePath, int frameWidth, int frameHeight)
+        public void LoadSpriteSheet(string id, string filePath, int frameWidth, int frameHeight)
         {
             if (_spriteSheets.ContainsKey(id)) return;
 
@@ -36,8 +36,20 @@ namespace VirtualFriend.Scripts
             _spriteSheets[id] = sheet;
         }
 
+        public void LoadFont(string id, string filePath)
+        {
+
+            // 4. Генерация кодовых точек для шрифта (Кириллица)
+            int[] codepoints = new int[512];
+            for (int i = 0; i < 95; i++) codepoints[i] = 32 + i;
+            for (int i = 0; i < 256; i++) codepoints[95 + i] = 0x0400 + i;
+            Font myFont = Raylib.LoadFontEx(filePath, 32, codepoints, codepoints.Length);
+
+            _fonts[id] = myFont;
+        }
+
         // Получение кадра из спрайт-листа
-        public static SpriteFrame GetSpriteFrame(string sheetId, int frameIndex)
+        public SpriteFrame GetSpriteFrame(string sheetId, int frameIndex)
         {
             if (_spriteSheets.TryGetValue(sheetId, out var sheet))
             {
@@ -46,9 +58,9 @@ namespace VirtualFriend.Scripts
             return default; // Возвратит пустой кадр, если не найдено
         }
 
-        public static Texture2D GetTexture(string id) => _textures.GetValueOrDefault(id);
+        public Texture2D GetTexture(string id) => _textures.GetValueOrDefault(id);
 
-        public static void UnloadAll()
+        public void UnloadAll()
         {
             foreach (var tex in _textures.Values) Raylib.UnloadTexture(tex);
             foreach (var sheet in _spriteSheets.Values) Raylib.UnloadTexture(sheet.AtlasTexture);
