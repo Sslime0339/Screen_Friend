@@ -13,6 +13,9 @@ namespace VirtualFriend.Scripts.GameObjects
         private int _animFrame = 0;
 
 
+        public float Size => _size;
+
+
         public BoxObject(World world, SysVector spawnPos, float size)
         {
             _size = size;

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using Raylib_cs;
+using VirtualFriend.Scripts.GameObjects;
 using SysVector = System.Numerics.Vector2;
 
 namespace VirtualFriend.Scripts
@@ -65,9 +66,9 @@ namespace VirtualFriend.Scripts
             bool isHoveringBox = false;
             foreach (var obj in gameObjects)
             {
-                if (obj.PhysicsBody != null && !obj.IsDestroyed)
+                if (obj.PhysicsBody != null && !obj.IsDestroyed && obj is BoxObject box)
                 {
-                    float halfSize = 1.0f / 2f;
+                    float halfSize = box.Size / 2f;
                     var pos = obj.PhysicsBody.Position;
 
                     if (currentMouseWorld.X >= pos.X - halfSize && currentMouseWorld.X <= pos.X + halfSize &&

@@ -21,6 +21,16 @@ using XnaVector = Microsoft.Xna.Framework.Vector2;
 
 
 
+// TODO: сделать интерфейс чтобы объект был кликабельным/таскаемым (возможно два разных интерфейса)
+// TODO: сделать сортировку отрисовки
+// TODO: сделать окно (виндовс формс или WPF) для создания объектов настроек и т.д.
+// TODO: сделать класс для UI (на Raylib) там текст, кнопочки, к нопкам можно применить интерфейс кликабельность
+// TODO: добавить класс для персонажей
+// TODO: добавить РИХЭЫШЪЕ
+
+
+
+
 
 namespace VirtualFriend
 {
@@ -210,9 +220,9 @@ namespace VirtualFriend
             {
                 foreach (var obj in _gameObjects)
                 {
-                    if (obj.PhysicsBody != null && !obj.IsDestroyed)
+                    if (obj.PhysicsBody != null && !obj.IsDestroyed && obj is BoxObject box)
                     {
-                        float halfSize = 1.0f / 2f; // Половина размера коробки в метрах
+                        float halfSize = box.Size / 2f; // Половина размера коробки в метрах
                         var pos = obj.PhysicsBody.Position;
 
                         // Проверяем, попал ли курсор в границы коробки
