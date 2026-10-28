@@ -90,6 +90,9 @@ namespace VirtualFriend
 
 
 
+            GameObjectFactory.Instance.CreateBox(_physicsSystem.World, new SysVector(30, 5), 5);
+
+
 
             while (_isRunning)
             {

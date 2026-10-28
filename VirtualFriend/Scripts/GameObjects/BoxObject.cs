@@ -33,21 +33,26 @@ namespace VirtualFriend.Scripts.GameObjects
             if (IsDestroyed) return;
 
 
-
             float rotationInDegrees = PhysicsBody.Rotation * (180f / (float)Math.PI);
 
-            // Задаем размеры вывода на экране
-            Rectangle destRec = new Rectangle(PhysicsBody.Position.X, PhysicsBody.Position.Y, _size, _size);
-            SysVector origin = new SysVector(_size / 2f, _size / 2f);
-            
-            int textureId = (int)((rotationInDegrees % 360 + 360) % 360);
+            int textureId = (int)((Math.Round(rotationInDegrees) % 360 + 360) % 360);
             SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, textureId);
 
-            //Console.WriteLine((int)rotationInDegrees);
-            //Console.WriteLine(currentFrame.Texture.Height);
+            // --- так как текстура в спрайт листе расположена спецефически, из-за краёв, её нужно правильно расположить
+            // потом этот функционал можно переместить куда нибуть
+
+            // короче магические числа для того чтобы текстура встала ровно в хит бокс
+
+            float dWidth = 0.64f * _size;
+            float dHeight = 0.64f * _size;
+
+            float dX =  + 0.045f * _size - dWidth / 2;
+            float dY = - 0.055f * _size - dHeight / 2;
+
+            Rectangle destRec = new Rectangle(PhysicsBody.Position.X + dX, PhysicsBody.Position.Y + dY, _size + dWidth, _size + dHeight);
+            SysVector origin = new SysVector(_size / 2f, _size / 2f);
 
 
-            renderer.DrawBox(destRec.Position, _size, _size, origin, rotationInDegrees, Color.Lime);
 
             // Отрисовка через ваш RenderEngine (или напрямую через Raylib)
             // Используем SourceRec нашего кадра вместо всей текстуры!
@@ -60,6 +65,14 @@ namespace VirtualFriend.Scripts.GameObjects
                 //rotationInDegrees,
                 Color.White
             );
+
+
+            // для отслеживания хитбокса
+            //destRec = new Rectangle(PhysicsBody.Position.X, PhysicsBody.Position.Y, _size, _size);
+            //origin = new SysVector(_size / 2f, _size / 2f);
+
+
+            //renderer.DrawBox(destRec.Position, _size, _size, origin, rotationInDegrees, new Color(0, 255, 0, 20));
         }
     }
 }

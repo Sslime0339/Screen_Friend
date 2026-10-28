@@ -138,10 +138,10 @@ namespace VirtualFriend.Scripts.GameObjects
 
         public override void Destroy(World world)
         {
-            foreach (var obj in _microObjects) obj.Destroy(world);
+            foreach (var obj in _microObjects) obj.Destroy(_localWorld);
             _microObjects.Clear();
 
-            ClearInnerBoundaries(world);
+            ClearInnerBoundaries(_localWorld);
 
             _localWorld.Clear();
 

@@ -55,7 +55,7 @@ namespace VirtualFriend.Scripts
                 new Rectangle(position.X, position.Y, width, height),
                 origin,
                 rotation,
-                Color.Red
+                color
             );
 
             /*
