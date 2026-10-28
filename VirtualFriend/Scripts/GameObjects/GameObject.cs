@@ -17,12 +17,13 @@ namespace VirtualFriend.Scripts.GameObjects
         public abstract void Update(float dt);
         public abstract void Draw(RenderEngine renderer, ResourceManager resourceManager);
 
-        public virtual void Destroy(World world)
+        public virtual void Destroy(World world) // TODO: убрать ссылку на world
         {
             IsDestroyed = true;
             if (PhysicsBody != null)
             {
-                world.DestroyBody(PhysicsBody);
+                PhysicsBody.RemoveFromWorld();
+                //world.DestroyBody(PhysicsBody);
                 PhysicsBody = null;
             }
         }

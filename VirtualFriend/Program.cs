@@ -97,6 +97,7 @@ namespace VirtualFriend
             while (_isRunning)
             {
 
+
                 float dt = Raylib.GetFrameTime();
 
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
@@ -190,9 +191,13 @@ namespace VirtualFriend
             {
                 foreach (var obj in _gameObjects)
                 {
-                    obj.Destroy(_physicsSystem.World);
+                    if (obj is BoxObject)
+                    {
+                        obj.Destroy(_physicsSystem.World);
+                    }
+                    
                 }
-                _gameObjects.Clear();
+
                 _draggedObject = null; // Сбрасываем захват при очистке
             }
 
