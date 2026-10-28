@@ -68,8 +68,13 @@ namespace VirtualFriend
             const float ppm = 50f; // Pixels Per Meter
 
 
+            _resourceManager = new ResourceManager();
+            _resourceManager.LoadSpriteSheet(Assets.Sheets.Box, "Assets/Textures/box_sheet.png", 128, 128);
+            _resourceManager.LoadFont(Assets.Fonts.MainFont, "Assets/Fonts/arial.ttf");
+
+
             _physicsSystem = new PhysicsSystem(new Microsoft.Xna.Framework.Vector2(0f, 19.6f)); // Гравитация
-            _renderEngine = new RenderEngine(ppm);
+            _renderEngine = new RenderEngine(ppm, _resourceManager);
             InitWalls(ppm);
 
 
@@ -83,9 +88,6 @@ namespace VirtualFriend
             _inputManager = new InputManager(_renderEngine);
 
 
-            _resourceManager = new ResourceManager();
-            _resourceManager.LoadSpriteSheet(Assets.Sheets.Box, "Assets/Textures/box_sheet.png", 128, 128);
-            _resourceManager.LoadFont(Assets.Fonts.MainFont, "Assets/Fonts/arial.ttf");
 
 
 
@@ -134,7 +136,8 @@ namespace VirtualFriend
 
 
             // После завершения цикла while (_isRunning)
-            _renderEngine.UnloadResources(); // Выгружаем текстуры и шрифты
+            //_renderEngine.UnloadResources(); // Выгружаем текстуры и шрифты
+            _resourceManager.UnloadAll();
             Raylib.CloseWindow();
 
         }

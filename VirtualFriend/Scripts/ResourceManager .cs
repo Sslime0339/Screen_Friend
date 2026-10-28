@@ -60,6 +60,8 @@ namespace VirtualFriend.Scripts
 
         public Texture2D GetTexture(string id) => _textures.GetValueOrDefault(id);
 
+        public Font GetFont(string id) => _fonts.GetValueOrDefault(id);
+
         public void UnloadAll()
         {
             foreach (var tex in _textures.Values) Raylib.UnloadTexture(tex);

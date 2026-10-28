@@ -18,11 +18,14 @@ namespace VirtualFriend.Scripts
         private Font _myFont;
         private Texture2D[] _boxTextures;
 
-        public RenderEngine(float pixelsPerMeter)
+        
+        public RenderEngine(float pixelsPerMeter, ResourceManager resourceManager)
         {
             Camera = new Camera2D { Zoom = pixelsPerMeter };
+            _myFont = resourceManager.GetFont(Assets.Fonts.MainFont);
         }
 
+        /*
         public void LoadResources()
         {
             // Здесь грузим шрифт Arial и GIF-анимацию ящика, как в вашем Main
@@ -31,7 +34,7 @@ namespace VirtualFriend.Scripts
         public void UnloadResources()
         {
             // Выгрузка ресурсов в конце игры
-        }
+        }*/
 
         public void Begin(Color clearColor)
         {
