@@ -4,12 +4,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-// Расширенная структура для хранения данных об окне
 struct WindowData
 {
     public string Title;
     public IntPtr Handle;
-    public int ZIndex; // 1 — самое верхнее окно, 2 — под ним и так далее
+    public int ZIndex;
     public bool IsMaximized;
     public float Width;
     public float Height;
@@ -19,7 +18,6 @@ struct WindowData
 
 class Program
 {
-    // Сигнатура делегата для перечисления окон
     delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -27,7 +25,7 @@ class Program
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool IsZoomed(IntPtr hWnd); // True, если окно развернуто на весь экран
+    public static extern bool IsZoomed(IntPtr hWnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
@@ -36,7 +34,20 @@ class Program
     private static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
-    private static extern bool IsIconic(IntPtr hWnd); // True, если окно свернуто
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    // Новые импорты для фильтрации системных окон
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
 
     private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
     private const int DWMWA_CLOAKED = 14;
@@ -62,41 +73,61 @@ class Program
         public int Bottom;
     }
 
-    // Управляющие переменные (заглушки из вашего кода для работоспособности)
     private static bool _isRunning = true;
     private static object _lock = new object();
-    private static float PixelsPerMeter = 1000f; // Коэффициент перевода пикселей в "метры"
+    private static float PixelsPerMeter = 1000f;
 
     static async Task Main()
     {
         Console.OutputEncoding = Encoding.UTF8;
         List<WindowData> windowList = new List<WindowData>();
+        IntPtr shellWindow = GetShellWindow(); // Получаем дескриптор рабочего стола для фильтрации
 
-        // Запускаем фоновую задачу сканирования окон ОС
         _ = Task.Run(async () =>
         {
             while (_isRunning)
             {
                 List<WindowData> currentWindows = new List<WindowData>();
-                int zCounter = 0; // Счетчик для определения Z-порядка
+                int zCounter = 0;
 
                 EnumWindows((hWnd, lParam) =>
                 {
-                    // 1. Базовые проверки на видимость
-                    if (!IsWindowVisible(hWnd)) return true;
-                    if (IsIconic(hWnd)) return true; // Пропускаем свернутые
+                    // 1. Базовая проверка видимости и свернутости
+                    if (!IsWindowVisible(hWnd) || IsIconic(hWnd)) return true;
 
-                    // 2. Получаем заголовок окна
-                    StringBuilder sb = new StringBuilder(256);
-                    GetWindowText(hWnd, sb, sb.Capacity);
-                    string title = sb.ToString();
+                    // 2. Исключаем Shell-окно (тот самый Program Manager)
+                    if (hWnd == shellWindow) return true;
+
+                    // 3. Получаем заголовок окна
+                    StringBuilder sbTitle = new StringBuilder(256);
+                    GetWindowText(hWnd, sbTitle, sbTitle.Capacity);
+                    string title = sbTitle.ToString();
                     if (string.IsNullOrWhiteSpace(title)) return true;
 
-                    // 3. Проверка на "скрытые" (Cloaked) окна Windows (например, окна на других виртуальных рабочих столах)
+                    // 4. Проверка на "скрытые" (Cloaked) окна (UWP-приложения в фоне)
                     DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
                     if (isCloaked) return true;
 
-                    // 4. Получаем точные координаты
+                    // 5. Фильтрация по имени системного класса Windows
+                    StringBuilder sbClass = new StringBuilder(256);
+                    GetClassName(hWnd, sbClass, sbClass.Capacity);
+                    string className = sbClass.ToString();
+
+                    // Отсекаем служебные классы Windows, которые не должны быть в оверлее
+                    if (className == "ApplicationFrameWindow" && title == "Настройки")
+                    {
+                        // Некоторые фоновые окна настроек UWP имеют видимый размер, но скрыты
+                        // Дополнительная проверка на фантомность окна UWP
+                    }
+                    if (className == "Windows.UI.Core.CoreWindow" ||
+                        className == "Progman" ||
+                        className == "WorkerW") return true;
+
+                    // 6. Исключаем Tool-окна (панели инструментов, скрытые фоновые утилиты)
+                    int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                    if ((exStyle & WS_EX_TOOLWINDOW) != 0) return true;
+
+                    // 7. Получаем точные координаты и размеры окна
                     if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
 
                     int width = rect.Right - rect.Left;
@@ -104,15 +135,12 @@ class Program
                     int x = rect.Left;
                     int y = rect.Top;
 
-                    // Фильтрация системного мусора и фантомных окон
+                    // Фильтрация невидимых окон нулевого размера или вынесенных далеко за экран
                     if (width <= 16 || height <= 16) return true;
                     if (x < -10000 || y < -10000) return true;
 
-                    // Увеличиваем Z-индекс. Так как EnumWindows идет сверху вниз,
-                    // первое валидное окно получит ZIndex = 1 (самое верхнее).
+                    // Если все проверки пройдены — окно считается валидным и пользовательским
                     zCounter++;
-
-                    // Проверяем, развернуто ли окно на весь экран
                     bool isMaximized = IsZoomed(hWnd);
 
                     currentWindows.Add(new WindowData
@@ -130,7 +158,6 @@ class Program
                     return true;
                 }, IntPtr.Zero);
 
-                // Синхронизируем и обновляем основной список
                 lock (_lock)
                 {
                     windowList = currentWindows;
@@ -140,7 +167,7 @@ class Program
             }
         });
 
-        // Поток для вывода информации в консоль
+        // Поток вывода в консоль
         while (_isRunning)
         {
             Console.Clear();
@@ -151,7 +178,6 @@ class Program
             List<WindowData> localList;
             lock (_lock)
             {
-                // Делаем копию для безопасного вывода без блокировки на время отрисовки
                 localList = new List<WindowData>(windowList);
             }
 
@@ -163,7 +189,6 @@ class Program
                 Console.WriteLine($"{win.ZIndex,-9} | {maximizedStatus,-15} | {sizeStr,-15} | {win.Title}");
             }
 
-            // Обновляем отображение в консоли раз в секунду, чтобы она не мерцала слишком часто
             await Task.Delay(1000);
         }
     }
