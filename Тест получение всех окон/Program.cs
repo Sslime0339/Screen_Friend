@@ -100,6 +100,9 @@ class Program
 
 
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
 
 
 
@@ -114,7 +117,7 @@ class Program
 
     private static bool _isRunning = true;
     private static object _lock = new object();
-    private static float PixelsPerMeter = 1000f;
+    private static float PixelsPerMeter = 1f;
 
     static async Task Main()
     {
@@ -131,7 +134,7 @@ class Program
 
                 EnumWindows((hWnd, lParam) =>
                 {
-                    // 1. Базовая проверка видимости и свернутости
+                    // 1. Базовая проверка видимости WinAPI и свернутости
                     if (!IsWindowVisible(hWnd) || IsIconic(hWnd)) return true;
 
                     // 2. Исключаем Shell-окно (рабочий стол)
@@ -143,20 +146,33 @@ class Program
                     string title = sbTitle.ToString();
                     if (string.IsNullOrWhiteSpace(title)) return true;
 
-                    // 4. Проверка на "скрытые" (Cloaked) окна (UWP-приложения в фоне)
+                    // 4. Тройная DWM-проверка (Главный убийца фантомных UWP окон вроде Realtek)
+                    // Проверка на Cloaked (замороженные/скрытые приложения Store)
                     DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
                     if (isCloaked) return true;
 
-                    // 5. Фильтрация по стилям (отсекаем отключенные окна, это убирает замороженные UWP)
+                    // ЖЕСТКИЙ ФИЛЬТР: Проверяем, отрисовывает ли DWM физическую рамку оверлея приложения.
+                    // Если приложение полностью ушло в фоновые процессы, DWM возвращает пустую или недоступную геометрию frames.
+                    if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+
+                    int width = rect.Right - rect.Left;
+                    int height = rect.Bottom - rect.Top;
+                    int x = rect.Left;
+                    int y = rect.Top;
+
+                    // Окна нулевого размера или сброшенные системой в виртуальные координаты
+                    if (width <= 16 || height <= 16) return true;
+                    if (x < -10000 || y < -10000) return true;
+
+                    // 5. Фильтрация по стилям (отсекаем отключенные системой окна)
                     int style = GetWindowLong(hWnd, GWL_STYLE);
                     if ((style & WS_DISABLED) != 0) return true;
 
-                    // 6. Проверка WindowPlacement (Убирает скрытые/приостановленные окна Windows Store)
+                    // 6. Проверка WindowPlacement (showCmd == 0 означает SW_HIDE)
                     WINDOWPLACEMENT placement = new WINDOWPLACEMENT();
                     placement.length = Marshal.SizeOf(placement);
                     if (GetWindowPlacement(hWnd, ref placement))
                     {
-                        // showCmd == 0 означает SW_HIDE (окно скрыто фоновым процессом)
                         if (placement.showCmd == 0) return true;
                     }
 
@@ -173,19 +189,19 @@ class Program
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
                     if ((exStyle & WS_EX_TOOLWINDOW) != 0) return true;
 
-                    // 9. Получаем точные координаты и размеры окна
-                    if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
+                    // 9. Бронебойный фильтр для Realtek и ApplicationFrameWindow:
+                    // Если класс является контейнером для UWP (ApplicationFrameWindow), но при этом 
+                    // само приложение свернуто пользователем/заморожено в фоне "стрелочками",
+                    // то Windows скрывает внутренний слой контента, оставляя невидимую системную "коробку".
+                    if (className == "ApplicationFrameWindow")
+                    {
+                        // Делаем проверочный тест: запрашиваем DWM-статус Cloaked как числовое значение.
+                        // Перепроверяем, что окно не является фантомной вкладкой системного интерфейса.
+                        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out int cloakedVal, sizeof(int));
+                        if (cloakedVal != 0) return true;
+                    }
 
-                    int width = rect.Right - rect.Left;
-                    int height = rect.Bottom - rect.Top;
-                    int x = rect.Left;
-                    int y = rect.Top;
-
-                    // Фильтрация невидимых окон нулевого размера или вынесенных далеко за экран
-                    if (width <= 16 || height <= 16) return true;
-                    if (x < -10000 || y < -10000) return true;
-
-                    // Если все жесткие проверки пройдены
+                    // Если все жесткие фильтры пройдены, окно гарантированно находится на экране
                     zCounter++;
                     bool isMaximized = IsZoomed(hWnd);
 
@@ -203,6 +219,7 @@ class Program
 
                     return true;
                 }, IntPtr.Zero);
+
 
 
                 lock (_lock)
