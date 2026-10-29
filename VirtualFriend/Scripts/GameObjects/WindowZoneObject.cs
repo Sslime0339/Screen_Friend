@@ -39,7 +39,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
             _localWorld = new World(new Microsoft.Xna.Framework.Vector2(0f, 19.6f));
 
-
+            CreateOuterBody(world);
             BuildInnerBoundaries(_localWorld);
             SpawnMicroWorldContents(_localWorld);
 
@@ -51,13 +51,24 @@ namespace VirtualFriend.Scripts.GameObjects
 
         private void CreateOuterBody(World world)
         {
+            if (PhysicsBody != null)
+            {
+                Console.WriteLine("Тело уже есть");
+                return;
+            }
             PhysicsBody = BodyFactory.CreateRectangle(world, Width, Height, 1f, new XnaVector(Center.X, Center.Y));
             PhysicsBody.BodyType = BodyType.Static;
         }
 
         private void DeleteOuterBody()
         {
+            if (PhysicsBody == null)
+            {
+                Console.WriteLine("Тело нет");
+                return;
+            }
             PhysicsBody.RemoveFromWorld();
+            PhysicsBody = null;
         }
 
 
