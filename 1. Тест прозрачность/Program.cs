@@ -1,99 +1,102 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using Raylib_cs;
+using System;
 using System.Numerics;
-using Raylib_cs;
 
 class Program
 {
-    // Импортируем функции Windows для работы с окнами
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-    // Структура для хранения координат окна Windows
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT
+    struct Character
     {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
+        public Vector2 Position;
+        public Vector2 Speed;
+        public Color Color;
     }
 
     static void Main()
     {
-        Raylib.SetConfigFlags(
-            ConfigFlags.UndecoratedWindow |
-            ConfigFlags.TransparentWindow |
-            ConfigFlags.MousePassthroughWindow
-        );
+        const int screenWidth = 800;
+        const int screenHeight = 600;
 
-        int monitor = Raylib.GetCurrentMonitor();
-        // По умолчанию рисовать можно везде (весь экран)
-        int screenWidth = Raylib.GetMonitorWidth(monitor);
-        int screenHeight = Raylib.GetMonitorHeight(monitor) - 60;
-
-
-        Raylib.InitWindow(screenWidth, screenHeight, "Desktop Sprite");
+        Raylib.InitWindow(screenWidth, screenHeight, "Raylib-cs - 100 Персонажей без Rlgl");
         Raylib.SetTargetFPS(60);
 
-        Vector2 position = new Vector2(300, 300);
-        float speed = 200.0f;
-        int radius = 30;
+        // 1. Создаем холст для отрисовки персонажей во весь экран
+        RenderTexture2D canvas = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+
+        // Создаем 100 персонажей
+        Character[] characters = new Character[100];
+        Random rand = new Random();
+        for (int i = 0; i < 100; i++)
+        {
+            characters[i].Position = new Vector2(rand.Next(50, 750), rand.Next(50, 550));
+            characters[i].Speed = new Vector2(rand.Next(-2, 3), rand.Next(-2, 3));
+            if (characters[i].Speed.X == 0 && characters[i].Speed.Y == 0) characters[i].Speed.X = 1;
+            characters[i].Color = new Color(rand.Next(100, 255), rand.Next(100, 255), rand.Next(100, 255), 255);
+        }
+
+        Rectangle windowRect = new Rectangle(300, 200, 200, 300); // Квадрат-ластик
 
         while (!Raylib.WindowShouldClose())
         {
-            float deltaTime = Raylib.GetFrameTime();
-            if (Raylib.IsKeyDown(KeyboardKey.Right)) position.X += speed * deltaTime;
-            if (Raylib.IsKeyDown(KeyboardKey.Left)) position.X -= speed * deltaTime;
-            if (Raylib.IsKeyDown(KeyboardKey.Down)) position.Y += speed * deltaTime;
-            if (Raylib.IsKeyDown(KeyboardKey.Up)) position.Y -= speed * deltaTime;
 
+
+            // Движение персонажей
+            for (int i = 0; i < 100; i++)
+            {
+                characters[i].Position += characters[i].Speed;
+                if (characters[i].Position.X < 0 || characters[i].Position.X > screenWidth) characters[i].Speed.X *= -1;
+                if (characters[i].Position.Y < 0 || characters[i].Position.Y > screenHeight) characters[i].Speed.Y *= -1;
+            }
+
+            // ----------------------------------------------------
+            // ШАГ 1: Рисуем персонажей и вырезаем квадрат на холсте
+            // ----------------------------------------------------
+            Raylib.BeginTextureMode(canvas);
+            Raylib.ClearBackground(Color.Blank); // Полностью прозрачный фон
+
+            // Сначала рисуем ВСЕХ 100 персонажей на прозрачный холст
+            for (int i = 0; i < 100; i++)
+            {
+                Raylib.DrawCircleV(characters[i].Position, 15, characters[i].Color);
+            }
+
+            // Включаем специальный режим смешивания (Стирание)
+            Raylib.BeginBlendMode(BlendMode.Custom);
+
+            // Этот квадрат буквально "выжигает" дыру во всех нарисованных персонажах
+            Raylib.DrawRectangleRec(windowRect, Color.Blank);
+
+            Raylib.EndBlendMode();
+            Raylib.EndTextureMode();
+
+            // ----------------------------------------------------
+            // ШАГ 2: Выводим результат на экран
+            // ----------------------------------------------------
             Raylib.BeginDrawing();
+            Raylib.ClearBackground(Color.RayWhite); // Фон экрана
 
-            // ИСПРАВЛЕНО: Очищаем фон абсолютно прозрачным цветом вместо черного
-            Raylib.ClearBackground(Color.Blank);
+            Rectangle windowRect2 = new Rectangle(300 + 50, 150 + 50, 200, 300);
+            Raylib.DrawRectangleRec(windowRect2, new Color(255, 150, 255, 80));
+
+            // Рисуем текстуру холста (переворачиваем по Y, так как в Raylib текстуры рендеринга инвертированы)
+            Raylib.DrawTextureRec(
+                canvas.Texture,
+                new Rectangle(0, 0, canvas.Texture.Width, -canvas.Texture.Height),
+                Vector2.Zero,
+                Color.White
+            );
 
 
-            IntPtr activeWindow = GetForegroundWindow();
 
-            // ИСПРАВЛЕНО: Объявляем переменную rect заранее или прямо здесь, 
-            // так как в условии выше (которое мы удалили) её больше нет.
-            if (activeWindow != IntPtr.Zero && GetWindowRect(activeWindow, out RECT rect))
-            {
-                // Если персонаж подошел к левой границе окна справа
-                if (position.X > rect.Right)
-                {
-                    // Разрешаем рисовать только СПРАВА от окна (от rect.Right до конца экрана)
-                    Raylib.BeginScissorMode(rect.Right, 0, screenWidth - rect.Right, screenHeight);
-                }
-                // Если персонаж подошел к правой границе окна слева
-                else if (position.X < rect.Left)
-                {
-                    // Разрешаем рисовать только СЛЕВА от окна (от 0 до rect.Left)
-                    Raylib.BeginScissorMode(0, 0, rect.Left, screenHeight);
-                }
-                else
-                {
-                    // Если он полностью внутри координат окна — не рисуем его
-                    Raylib.BeginScissorMode(0, 0, 0, 0);
-                }
-            }
-            else
-            {
-                // Если окон нет, рисуем на весь экран
-                Raylib.BeginScissorMode(0, 0, screenWidth, screenHeight);
-            }
 
-            // Отрисовка персонажа (она будет автоматически "обрезаться" по границам Scissor)
-            Raylib.DrawCircleV(position, radius, Color.Red);
+            // Рисуем визуальный полупрозрачный квадрат поверх "дыры"
+            Raylib.DrawRectangleRec(windowRect, new Color(0, 150, 255, 80));
 
-            Raylib.EndScissorMode(); // Обязательно закрываем режим обрезки
+            Raylib.DrawFPS(10, 10);
             Raylib.EndDrawing();
         }
+
+        // Чистим память
+        Raylib.UnloadRenderTexture(canvas);
         Raylib.CloseWindow();
     }
 }
