@@ -23,6 +23,7 @@ namespace VirtualFriend.Scripts
             public float CenterX;
             public float CenterY;
             public int ZIndex;
+            public bool IsMinimized; // <-- Добавили флаг свёрнутости
         }
 
         private List<WindowData> _pendingWindows = new List<WindowData>();
@@ -50,7 +51,7 @@ namespace VirtualFriend.Scripts
         {
             List<WindowData> snapshot = GetWindowsSnapshot();
 
-            // 1. Удаляем закрытые окна
+            // 1. Удаляем только реально ЗАКРЫТЫЕ окна (которых вообще больше нет в системе)
             for (int i = _activeWindowObjects.Count - 1; i >= 0; i--)
             {
                 var activeWin = _activeWindowObjects[i];
@@ -67,14 +68,33 @@ namespace VirtualFriend.Scripts
                 var existingWindow = _activeWindowObjects.Find(w => w.Hwnd == data.Hwnd);
                 if (existingWindow == null)
                 {
-                    // Создаем новый объект окна и сохраняем его в список
-                    var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data, ppm);
-                    _activeWindowObjects.Add(newWindowObj);
+                    // Создаем новый объект окна только если оно НЕ свёрнуто в момент первого обнаружения
+                    // (Или можно создавать в любом случае, но сразу скрывать)
+                    if (!data.IsMinimized)
+                    {
+                        var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data, ppm);
+                        _activeWindowObjects.Add(newWindowObj);
+                    }
                 }
                 else
                 {
-                    // Если окно уже есть — обновляем его параметры в игровом движке
-                    existingWindow.UpdatePositionAndSize(data);
+                    // Если окно уже существует в игровом мире
+                    if (data.IsMinimized)
+                    {
+                        // TODO: Вызовите метод скрытия вашего объекта, например:
+                        // existingWindow.Hide(); 
+                        // или existingWindow.SetActive(false);
+                        // Также желательно временно отключать его физическое тело в VelcroPhysics, если это необходимо
+                    }
+                    else
+                    {
+                        // Если окно вернулось из свёрнутого состояния — показываем его обратно
+                        // existingWindow.Show(); 
+                        // или existingWindow.SetActive(true);
+
+                        // Если окно активно — обновляем его параметры в игровом движке
+                        existingWindow.UpdatePositionAndSize(data);
+                    }
                 }
             }
         }
@@ -93,13 +113,16 @@ namespace VirtualFriend.Scripts
 
                     Win32Native.EnumWindows((hWnd, lParam) =>
                     {
-
                         // Проверка что окно не является самим окном Raylib
                         if (hWnd == ReylibHWnd) return true;
 
+                        // ПРОВЕРКА НА СВЁРНУТОСТЬ
+                        // Свёрнутые окна технически "невидимы" для IsWindowVisible, поэтому проверяем IsIconic в первую очередь
+                        bool isMinimized = Win32Native.IsIconic(hWnd);
 
-                        // 1. Базовая проверка видимости WinAPI и свернутости
-                        if (!Win32Native.IsWindowVisible(hWnd) || Win32Native.IsIconic(hWnd)) return true;
+                        // Модифицированная базовая проверка видимости: 
+                        // Пропускаем окно, только если оно одновременно и НЕвидимо, и НЕ свёрнуто.
+                        if (!Win32Native.IsWindowVisible(hWnd) && !isMinimized) return true;
 
                         // 2. Исключаем Shell-окно (рабочий стол)
                         if (hWnd == shellWindow) return true;
@@ -120,7 +143,10 @@ namespace VirtualFriend.Scripts
                         int height = rect.Bottom - rect.Top;
 
                         // Окна нулевого/минимального размера или сброшенные системой в виртуальные координаты
-                        if (width <= 16 || height <= 16 || rect.Left < -10000 || rect.Top < -10000) return true;
+                        if (!isMinimized)
+                        {
+                            if (width <= 16 || height <= 16 || rect.Left < -10000 || rect.Top < -10000) return true;
+                        }
 
                         // 5. Фильтрация по стилям (отсекаем отключенные системой окна)
                         int style = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_STYLE);
@@ -154,15 +180,6 @@ namespace VirtualFriend.Scripts
                             if (cloakedVal != 0) return true;
                         }
 
-                        // 10. Проверка на соответствие размерам рабочего стола или экрана
-                        //if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
-                        //{
-                            //if (!Win32Native.IsZoomed(hWnd))
-                            //{
-
-
-
-
                         zCounter++;
 
                         currentWindows.Add(new WindowData
@@ -172,10 +189,10 @@ namespace VirtualFriend.Scripts
                             Height = height / _pixelsPerMeter,
                             CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,
                             CenterY = (rect.Top + height / 2f) / _pixelsPerMeter,
-                            ZIndex = zCounter
+                            ZIndex = zCounter,
+                            IsMinimized = isMinimized // <-- Записываем состояние
                         });
-                            //}
-                        //}
+
                         return true;
                     }, IntPtr.Zero);
 
@@ -189,8 +206,6 @@ namespace VirtualFriend.Scripts
         {
             lock (_lock) { return new List<WindowData>(_pendingWindows); }
         }
-
-
 
         public List<WindowZoneObject> GetActiveWindowObjects()
         {

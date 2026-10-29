@@ -203,6 +203,8 @@ namespace VirtualFriend.Scripts.GameObjects
             // Отрисовка отладочной рамки самого окна (уже на экране)
             var rect = new Rectangle((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm, Width * _ppm, Height * _ppm);
             Raylib.DrawRectangleLinesEx(rect, 1f, Color.Blue);
+
+            renderer.DrawTextWithShadow($"{this.Hwnd}", new SysVector((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm), 24, Color.White);
 #endif
         }
 
