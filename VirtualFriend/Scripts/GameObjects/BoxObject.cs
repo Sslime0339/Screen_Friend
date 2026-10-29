@@ -1,20 +1,19 @@
-﻿using Raylib_cs;
-using Genbox.VelcroPhysics.Dynamics;
+﻿using Genbox.VelcroPhysics.Dynamics;
 using Genbox.VelcroPhysics.Factories;
-using XnaVector = Microsoft.Xna.Framework.Vector2;
+using Raylib_cs;
+using VirtualFriend.Scripts.Interfaces;
 using SysVector = System.Numerics.Vector2;
+using XnaVector = Microsoft.Xna.Framework.Vector2;
 
 namespace VirtualFriend.Scripts.GameObjects
 {
-    internal class BoxObject : GameObject
+    // Добавили наследование интерфейса IDraggable
+    internal class BoxObject : GameObject, IDraggable
     {
-
         private readonly float _size;
         private int _animFrame = 0;
 
-
         public float Size => _size;
-
 
         public BoxObject(World world, SysVector spawnPos, float size)
         {
@@ -23,59 +22,88 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.BodyType = BodyType.Dynamic;
             PhysicsBody.Restitution = 0.2f;
             PhysicsBody.Friction = 0.6f;
-
         }
+
+        // --- Реализация интерфейса IClickable ---
+
+        public bool IsUnderMouse(SysVector mouseWorldPos)
+        {
+            if (PhysicsBody == null || IsDestroyed) return false;
+
+            float halfSize = _size / 2f;
+            var pos = PhysicsBody.Position;
+
+            return mouseWorldPos.X >= pos.X - halfSize && mouseWorldPos.X <= pos.X + halfSize &&
+                   mouseWorldPos.Y >= pos.Y - halfSize && mouseWorldPos.Y <= pos.Y + halfSize;
+        }
+
+        public void OnClick()
+        {
+            // Логика при простом клике (если нужна в будущем)
+        }
+
+        // --- Реализация интерфейса IDraggable ---
+
+        public void OnDragStart()
+        {
+            if (PhysicsBody == null) return;
+            // Обнуляем старые скорости, чтобы коробка мгновенно перешла под контроль
+            PhysicsBody.LinearVelocity = XnaVector.Zero;
+            PhysicsBody.AngularVelocity = 0f;
+        }
+
+        public void OnDrag(XnaVector targetWorldPos, float responsiveness)
+        {
+            if (PhysicsBody == null) return;
+
+            // Вычисляем вектор расстояния до мыши
+            float targetX = targetWorldPos.X - PhysicsBody.Position.X;
+            float targetY = targetWorldPos.Y - PhysicsBody.Position.Y;
+
+            // Притягиваем ящик к курсору
+            PhysicsBody.LinearVelocity = new XnaVector(
+                targetX * responsiveness,
+                targetY * responsiveness
+            );
+        }
+
+        public void OnDragEnd(XnaVector releaseVelocity)
+        {
+            if (PhysicsBody == null) return;
+            // Передаем финальное ускорение от броска руки
+            PhysicsBody.LinearVelocity = releaseVelocity;
+        }
+
+        // --- Стандартные методы GameObject ---
 
         public override void Update(float dt)
         {
-            // Здесь можно обновлять кадры анимации конкретно этой коробки
         }
 
         public override void Draw(RenderEngine renderer, ResourceManager resourceManager)
         {
             if (IsDestroyed) return;
 
-
             float rotationInDegrees = PhysicsBody.Rotation * (180f / (float)Math.PI);
-
             int textureId = (int)((Math.Round(rotationInDegrees) % 360 + 360) % 360);
             SpriteFrame currentFrame = resourceManager.GetSpriteFrame(Assets.Sheets.Box, textureId);
 
-            // --- так как текстура в спрайт листе расположена спецефически, из-за краёв, её нужно правильно расположить
-            // потом этот функционал можно переместить куда нибуть
-
-            // короче магические числа для того чтобы текстура встала ровно в хит бокс
-
             float dWidth = 0.64f * _size;
             float dHeight = 0.64f * _size;
-
-            float dX =  + 0.045f * _size - dWidth / 2;
-            float dY = - 0.055f * _size - dHeight / 2;
+            float dX = 0.045f * _size - dWidth / 2;
+            float dY = -0.055f * _size - dHeight / 2;
 
             Rectangle destRec = new Rectangle(PhysicsBody.Position.X + dX, PhysicsBody.Position.Y + dY, _size + dWidth, _size + dHeight);
             SysVector origin = new SysVector(_size / 2f, _size / 2f);
 
-
-
-            // Отрисовка через ваш RenderEngine (или напрямую через Raylib)
-            // Используем SourceRec нашего кадра вместо всей текстуры!
             renderer.DrawTexturePro(
                 currentFrame.Texture,
                 currentFrame.SourceRec,
                 destRec,
                 origin,
                 0,
-                //rotationInDegrees,
                 Color.White
             );
-
-
-            // для отслеживания хитбокса
-            //destRec = new Rectangle(PhysicsBody.Position.X, PhysicsBody.Position.Y, _size, _size);
-            //origin = new SysVector(_size / 2f, _size / 2f);
-
-
-            //renderer.DrawBox(destRec.Position, _size, _size, origin, rotationInDegrees, new Color(0, 255, 0, 20));
         }
     }
 }

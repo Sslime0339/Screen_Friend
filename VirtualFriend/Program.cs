@@ -13,6 +13,7 @@ using System.Diagnostics;
 using VirtualFriend.Scripts;
 // подключаем другие прстранства имён
 using VirtualFriend.Scripts.GameObjects;
+using VirtualFriend.Scripts.Interfaces;
 using static VirtualFriend.Scripts.Win32Native;
 using SysVector = System.Numerics.Vector2;
 using XnaVector = Microsoft.Xna.Framework.Vector2;
@@ -47,10 +48,8 @@ namespace VirtualFriend
         private static readonly List<GameObject> _gameObjects = new List<GameObject>();
         private static bool _isRunning = true;
 
-
-
-        private static GameObject _draggedObject = null;
-
+        // ИСПОЛЬЗУЕМ ИНТЕРФЕЙС: Храним ссылку на любой таскаемый объект
+        private static IDraggable _draggedObject = null;
 
         static void Main(string[] args)
         {
@@ -113,7 +112,7 @@ namespace VirtualFriend
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
                 _inputManager.Update(_gameObjects, dt);
 
-                // --- Логика управления ящиками ---
+                // --- Логика управления ящиками и объектами ---
                 HandleInput();
 
                 // Обновление логики объектов
@@ -148,9 +147,6 @@ namespace VirtualFriend
                 if (Raylib.WindowShouldClose() || _inputManager.IsExitPressed()) _isRunning = false;
             }
 
-
-            // После завершения цикла while (_isRunning)
-            //_renderEngine.UnloadResources(); // Выгружаем текстуры и шрифты
             _resourceManager.UnloadAll();
             Raylib.CloseWindow();
 
@@ -159,31 +155,20 @@ namespace VirtualFriend
 
         private static void GetWorkAreaSize(out int workAreaWidth, out int workAreaHeight)
         {
-
-            const int SPI_GETWORKAREA = 48; // Код для получения рабочей области
-
+            const int SPI_GETWORKAREA = 48;
             RECT workArea = new RECT();
             SystemParametersInfo(SPI_GETWORKAREA, 0, ref workArea, 0);
-
-            // Вычисляем чистую высоту (Нижняя граница минус Верхняя граница)
             workAreaHeight = workArea.Bottom - workArea.Top;
             workAreaWidth = workArea.Right - workArea.Left;
-
         }
-
 
         private static void GetScreenSize(out int screenWidth, out int screenHeight)
         {
-
-            // Константы для ширины и высоты главного экрана
             const int SM_CXSCREEN = 0;
             const int SM_CYSCREEN = 1;
-            // 1. Получаем размеры экрана ДО ИНИЦИАЛИЗАЦИИ Raylib
             screenWidth = GetSystemMetrics(SM_CXSCREEN);
             screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
         }
-
 
         private static void HandleInput()
         {
@@ -205,80 +190,62 @@ namespace VirtualFriend
                     {
                         obj.Destroy(_physicsSystem.World);
                     }
-                    
                 }
-
                 _draggedObject = null; // Сбрасываем захват при очистке
             }
 
-            // --- 3. ХВАТАНИЕ И ПЕРЕТАСКИВАНИЕ (Левая кнопка мыши) ---
+            // --- 3. ХВАТАНИЕ И ПЕРЕТАСКИВАНИЕ (Через интерфейсы) ---
             SysVector currentMouseWorld = _inputManager.GetMouseWorldPosition();
+            XnaVector currentMouseWorldXna = new XnaVector(currentMouseWorld.X, currentMouseWorld.Y);
 
             // 1. СОБЫТИЕ: Клик только что произошел (Нажатие кнопки)
-            // Захватываем объект ТОЛЬКО если мы никого не держим в данный момент
             if (_inputManager.IsLButtonPressed() && _draggedObject == null)
             {
                 foreach (var obj in _gameObjects)
                 {
-                    if (obj.PhysicsBody != null && !obj.IsDestroyed && obj is BoxObject box)
+                    // Проверяем, поддерживает ли объект перетаскивание
+                    if (obj is IDraggable draggable)
                     {
-                        float halfSize = box.Size / 2f; // Половина размера коробки в метрах
-                        var pos = obj.PhysicsBody.Position;
-
-                        // Проверяем, попал ли курсор в границы коробки
-                        if (currentMouseWorld.X >= pos.X - halfSize && currentMouseWorld.X <= pos.X + halfSize &&
-                            currentMouseWorld.Y >= pos.Y - halfSize && currentMouseWorld.Y <= pos.Y + halfSize)
+                        // Проверяем попадание мыши методами интерфейса IClickable
+                        if (draggable.IsUnderMouse(currentMouseWorld))
                         {
-                            _draggedObject = obj;
+                            _draggedObject = draggable;
 
-                            // Обнуляем старые скорости, чтобы коробка мгновенно перешла под контроль
-                            _draggedObject.PhysicsBody.LinearVelocity = Microsoft.Xna.Framework.Vector2.Zero;
-                            _draggedObject.PhysicsBody.AngularVelocity = 0f;
+                            // Вызываем события интерфейсов
+                            _draggedObject.OnClick();
+                            _draggedObject.OnDragStart();
                             break;
                         }
                     }
                 }
             }
             // 2. СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
-            // Используем else if, чтобы бросок обрабатывался отдельно от удержания
             else if (_inputManager.IsLButtonReleased() && _draggedObject != null)
             {
                 float launchModifier = 1.0f;
-
-                // Передаем финальное ускорение от броска руки
-                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
+                XnaVector releaseVelocity = new XnaVector(
                     _inputManager.MouseWorldVelocity.X * launchModifier,
                     _inputManager.MouseWorldVelocity.Y * launchModifier
                 );
 
-                // СТРОГО ОБЯЗАТЕЛЬНО: зануляем ссылку, чтобы программа забыла про этот ящик
+                // Оповещаем объект об окончании перетаскивания и передаем скорость броска
+                _draggedObject.OnDragEnd(releaseVelocity);
                 _draggedObject = null;
             }
             // 3. СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание)
-            // Выполняется ТОЛЬКО если кнопка зажата, объект выбран и мы его НЕ отпускаем в этом кадре
             else if (_inputManager.IsLButtonDown() && _draggedObject != null)
             {
-                // Вычисляем вектор расстояния до мыши
-                float targetX = currentMouseWorld.X - _draggedObject.PhysicsBody.Position.X;
-                float targetY = currentMouseWorld.Y - _draggedObject.PhysicsBody.Position.Y;
-
                 float responsiveness = 12f;
 
-                // Притягиваем ящик к курсору
-                _draggedObject.PhysicsBody.LinearVelocity = new Microsoft.Xna.Framework.Vector2(
-                    targetX * responsiveness,
-                    targetY * responsiveness
-                );
+                // Передаем объекту задачу следовать за курсором
+                _draggedObject.OnDrag(currentMouseWorldXna, responsiveness);
             }
 
-            // Дополнительная страховка: если физически кнопка мыши отпущена в Windows, 
-            // но игра пропустила событие IsLButtonReleased из-за потери фокуса
+            // Страховка от потери фокуса Windows
             if (!_inputManager.IsLButtonDown() && _draggedObject != null)
             {
                 _draggedObject = null;
             }
-
-
         }
 
 

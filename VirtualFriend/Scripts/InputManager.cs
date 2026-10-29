@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Raylib_cs;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using Raylib_cs;
 using VirtualFriend.Scripts.GameObjects;
+using VirtualFriend.Scripts.Interfaces;
 using SysVector = System.Numerics.Vector2;
 
 namespace VirtualFriend.Scripts
@@ -62,25 +63,23 @@ namespace VirtualFriend.Scripts
                 _mouseWorldVelocity = SysVector.Zero;
             }
 
-            // 3. Логика динамического клика насквозь
-            bool isHoveringBox = false;
+            // 3. Логика динамического клика насквозь через интерфейс IClickable
+            bool isHoveringObject = false;
             foreach (var obj in gameObjects)
             {
-                if (obj.PhysicsBody != null && !obj.IsDestroyed && obj is BoxObject box)
+                // Проверяем, реализует ли объект интерфейс кликабельности
+                if (obj is IClickable clickable)
                 {
-                    float halfSize = box.Size / 2f;
-                    var pos = obj.PhysicsBody.Position;
-
-                    if (currentMouseWorld.X >= pos.X - halfSize && currentMouseWorld.X <= pos.X + halfSize &&
-                        currentMouseWorld.Y >= pos.Y - halfSize && currentMouseWorld.Y <= pos.Y + halfSize)
+                    // Сам объект решает, попала ли в него мышь
+                    if (clickable.IsUnderMouse(currentMouseWorld))
                     {
-                        isHoveringBox = true;
+                        isHoveringObject = true;
                         break;
                     }
                 }
             }
 
-            if (isHoveringBox)
+            if (isHoveringObject)
             {
                 Raylib.ClearWindowState(ConfigFlags.MousePassthroughWindow);
             }
