@@ -60,6 +60,7 @@ namespace VirtualFriend.Scripts
         }
 
         // Метод для создания зон окон
+        // TODO: как костыль чтобы не рисовать эти объекты когда свёрнуты, 
         public WindowZoneObject CreateWindowZone(World world, WindowManager.WindowData data, float ppm)
         {
             // Передаем саму фабрику (this) внутрь зоны, 

@@ -56,6 +56,11 @@ namespace VirtualFriend.Scripts.GameObjects
 
         public bool IsUnderMouse(SysVector mouseWorldPos)
         {
+            if (CurrentWindow != null)
+            {
+                if (!CurrentWindow.IsShow) return false;
+            }
+
             if (PhysicsBody == null || IsDestroyed) return false;
 
             float halfSize = _size / 2f;

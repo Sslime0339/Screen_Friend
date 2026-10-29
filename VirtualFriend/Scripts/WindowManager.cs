@@ -12,6 +12,7 @@ namespace VirtualFriend.Scripts
     {
         // Хранилище активных игровых объектов окон
         private readonly List<WindowZoneObject> _activeWindowObjects = new List<WindowZoneObject>();
+        //private readonly List<WindowZoneObject> _hideWindowObjects = new List<WindowZoneObject>();
         private readonly World _physicsWorld;
         private readonly float _pixelsPerMeter;
 
@@ -85,6 +86,8 @@ namespace VirtualFriend.Scripts
                         {
                             // TODO: Вызовите метод скрытия вашего объекта, например:
                             existingWindow.Hide();
+                            //_hideWindowObjects.Add(existingWindow);
+                            //_activeWindowObjects.Remove(existingWindow);
                             // или existingWindow.SetActive(false);
                             // Также желательно временно отключать его физическое тело в VelcroPhysics, если это необходимо
                         }
@@ -95,6 +98,8 @@ namespace VirtualFriend.Scripts
                         {
                             // Если окно вернулось из свёрнутого состояния — показываем его обратно
                             existingWindow.Show();
+                            //_hideWindowObjects.Remove(existingWindow);
+                            //_activeWindowObjects.Add(existingWindow);
                             // или existingWindow.SetActive(true);
 
                             // Если окно активно — обновляем его параметры в игровом движке

@@ -174,6 +174,18 @@ namespace VirtualFriend.Scripts.GameObjects
             Raylib.BeginTextureMode(_canvas);
             Raylib.ClearBackground(Color.Blank); // Полностью прозрачный холст
 
+
+            // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
+            _microObjects.Sort((a, b) =>
+            {
+                // 1. Сначала сравниваем по слою (Layer)
+                int layerCompare = a.Layer.CompareTo(b.Layer);
+                if (layerCompare != 0) return layerCompare;
+
+                // 2. Если слои равны, сортируем по внутреннему ZIndex
+                return a.ZIndex.CompareTo(b.ZIndex);
+            });
+
             renderer.BeginWorldSpace(); // Включаем матрицу камеры
             foreach (var obj in _microObjects)
             {
@@ -186,6 +198,8 @@ namespace VirtualFriend.Scripts.GameObjects
 
             foreach (var win in allWindows)
             {
+                if (!win.IsShow) continue;
+
                 // Если чужое окно выше нас по иерархии окон Windows (1 — топ)
                 if (win.Hwnd != this.Hwnd && win.ZIndex < this.ZIndex)
                 {

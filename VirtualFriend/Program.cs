@@ -21,6 +21,13 @@ using XnaVector = Microsoft.Xna.Framework.Vector2;
 
 
 
+// TODO: вынести сортировку и отрисовку в отдельную функцию
+// TODO: Сделать чтобы если ящик перекрывает окно то за ящик нельзя схватиться
+// TODO: Починить физическое тело окон
+// TODO: Сделать норм миры хз
+// TODO: хрень полная
+
+
 
 // TODO: сделать интерфейс чтобы объект был кликабельным/таскаемым (возможно два разных интерфейса)
 // TODO: сделать сортировку отрисовки
@@ -139,7 +146,7 @@ namespace VirtualFriend
 
 
                 // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
-                _allGameObjects.Sort((a, b) =>
+                _desktopGameObjects.Sort((a, b) =>
                 {
                     // 1. Сначала сравниваем по слою (Layer)
                     int layerCompare = a.Layer.CompareTo(b.Layer);
@@ -211,6 +218,7 @@ namespace VirtualFriend
                 float boxSize = 1.0f;
                 BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
                 _desktopGameObjects.Add(newBox);
+                HandleObjectTeleportation(newBox, mouseWorldPos, new XnaVector(0,0));
             }
 
             // --- 2. Очистка сцены (Клавиша X) ---
@@ -261,42 +269,7 @@ namespace VirtualFriend
                     _inputManager.MouseWorldVelocity.Y * launchModifier
                 );
 
-
-                // Перемещения объекта между окнами
-                if ((_draggedObject is GameObject boxObj) && (boxObj is ITeleportable teleportableObj))
-                {
-
-                    // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ: Получаем верхнее окно под мышкой
-                    WindowZoneObject topWindow = GetTopWindowUnderMouse(currentMouseWorld);
-
-                    if (topWindow != null)
-                    {
-                        
-                        if (boxObj.CurrentWindow != topWindow)
-                        {
-                            // если CurrentWindow == null то он находится на рабочем столе
-                            if (boxObj.CurrentWindow != null)
-                            {
-                                boxObj.CurrentWindow.TeleportOut(boxObj);
-                            }
-                            else
-                            {
-                                _desktopGameObjects.Remove(boxObj);
-                            }
-
-                            topWindow.TeleportIn(boxObj, currentMouseWorld, releaseVelocity);
-
-                            Console.WriteLine("Телепорт");
-                        }
-                    }
-                    else if (boxObj.CurrentWindow != null) // перемещаем на рабочий стол
-                    {
-                        boxObj.CurrentWindow.TeleportOut(boxObj);
-                        teleportableObj.TeleportToWorld(_physicsSystem.World, currentMouseWorld, releaseVelocity);
-                        _desktopGameObjects.Add(boxObj);
-                    }
-
-                }
+                if (_draggedObject is GameObject boxObj) HandleObjectTeleportation(boxObj, currentMouseWorld, releaseVelocity);
 
                 _draggedObject.OnDragEnd(releaseVelocity);
                 _draggedObject = null;
@@ -317,6 +290,52 @@ namespace VirtualFriend
                 _draggedObject = null;
             }
         }
+        private static void HandleObjectTeleportation(GameObject obj, SysVector currentMouseWorld, XnaVector releaseVelocity)
+        {
+            if (obj is ITeleportable teleportableObj)
+            {
+                // Получаем верхнее окно под мышкой
+                WindowZoneObject topWindow = GetTopWindowUnderMouse(currentMouseWorld);
+
+                if (topWindow != null)
+                {
+                    // Если окно под мышкой отличается от текущего окна объекта
+                    if (obj.CurrentWindow != topWindow)
+                    {
+                        // Если объект был внутри какого-то окна, извлекаем его оттуда
+                        if (obj.CurrentWindow != null)
+                        {
+                            obj.CurrentWindow.TeleportOut(obj);
+                        }
+                        // Если объект был на рабочем столе (внутри списка GameObject), удаляем его оттуда
+                        else if (teleportableObj is GameObject gameObj)
+                        {
+                            _desktopGameObjects.Remove(gameObj);
+                        }
+
+                        // Переносим объект в новое окно
+                        topWindow.TeleportIn(obj, currentMouseWorld, releaseVelocity);
+                        Console.WriteLine("Объект телепортирован в окно");
+                    }
+                }
+                // Если окон под мышкой нет, но объект сейчас находится внутри окна — выносим его на рабочий стол
+                else if (obj.CurrentWindow != null)
+                {
+                    obj.CurrentWindow.TeleportOut(obj);
+                    teleportableObj.TeleportToWorld(_physicsSystem.World, currentMouseWorld, releaseVelocity);
+
+                    // Если это игровой объект, возвращаем его в список отрисовки рабочего стола
+                    if (teleportableObj is GameObject gameObj)
+                    {
+                        _desktopGameObjects.Add(gameObj);
+                    }
+
+                    Console.WriteLine("Объект телепортирован на рабочий стол");
+                }
+            }
+        }
+
+
 
 
         private static void InitWalls(float PixelsPerMeter)
@@ -376,6 +395,8 @@ namespace VirtualFriend
             // Собираем все окна, в границы которых попадает курсор мыши
             foreach (var win in _windowManager.GetActiveWindowObjects())
             {
+                if (!win.IsShow) continue;
+
                 float halfW = win.Width / 2f;
                 float halfH = win.Height / 2f;
 
