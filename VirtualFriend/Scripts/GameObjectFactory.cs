@@ -60,11 +60,11 @@ namespace VirtualFriend.Scripts
         }
 
         // Метод для создания зон окон
-        public WindowZoneObject CreateWindowZone(World world, WindowManager.WindowData data)
+        public WindowZoneObject CreateWindowZone(World world, WindowManager.WindowData data, float ppm)
         {
             // Передаем саму фабрику (this) внутрь зоны, 
             // чтобы зона могла плодить микро-коробки через фабрику!
-            var zone = new WindowZoneObject(world, data);
+            var zone = new WindowZoneObject(world, data, ppm);
             _gameObjects.Add(zone); // АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В СПИСОК
             return zone;
         }

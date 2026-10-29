@@ -17,11 +17,12 @@ namespace VirtualFriend.Scripts
 
         public struct WindowData
         {
-            public IntPtr Hwnd; // Добавлено для связи с Win32 API
+            public IntPtr Hwnd;
             public float Width;
             public float Height;
             public float CenterX;
             public float CenterY;
+            public int ZIndex;
         }
 
         private List<WindowData> _pendingWindows = new List<WindowData>();
@@ -45,7 +46,7 @@ namespace VirtualFriend.Scripts
         }
 
         // Обновление состояния: создание, актуализация и удаление игровых объектов окон
-        public void Update()
+        public void Update(float ppm)
         {
             List<WindowData> snapshot = GetWindowsSnapshot();
 
@@ -67,7 +68,7 @@ namespace VirtualFriend.Scripts
                 if (existingWindow == null)
                 {
                     // Создаем новый объект окна и сохраняем его в список
-                    var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data);
+                    var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data, ppm);
                     _activeWindowObjects.Add(newWindowObj);
                 }
                 else
@@ -85,6 +86,8 @@ namespace VirtualFriend.Scripts
                 const int DWMWA_CLOAKED = 14;
                 while (_isRunning)
                 {
+                    int zCounter = 0;
+
                     List<WindowData> currentWindows = new List<WindowData>();
                     Win32Native.EnumWindows((hWnd, lParam) =>
                     {
@@ -106,13 +109,16 @@ namespace VirtualFriend.Scripts
                         {
                             if (!Win32Native.IsZoomed(hWnd) && !Win32Native.IsIconic(hWnd))
                             {
+                                zCounter++;
+
                                 currentWindows.Add(new WindowData
                                 {
                                     Hwnd = hWnd, // Сохраняем хэндл окна
                                     Width = width / _pixelsPerMeter,
                                     Height = height / _pixelsPerMeter,
                                     CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,
-                                    CenterY = (rect.Top + height / 2f) / _pixelsPerMeter
+                                    CenterY = (rect.Top + height / 2f) / _pixelsPerMeter,
+                                    ZIndex = zCounter
                                 });
                             }
                         }
@@ -128,6 +134,13 @@ namespace VirtualFriend.Scripts
         public List<WindowData> GetWindowsSnapshot()
         {
             lock (_lock) { return new List<WindowData>(_pendingWindows); }
+        }
+
+
+
+        public List<WindowZoneObject> GetActiveWindowObjects()
+        {
+            return _activeWindowObjects;
         }
 
         public void Stop() => _isRunning = false;

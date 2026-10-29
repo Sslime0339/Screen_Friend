@@ -122,7 +122,7 @@ namespace VirtualFriend
                     if (_gameObjects[i].IsDestroyed) _gameObjects.RemoveAt(i);
                 }
 
-                _windowManager.Update();
+                _windowManager.Update(ppm);
 
                 // Шаг физического мира
                 _physicsSystem.Step(dt);
@@ -146,9 +146,22 @@ namespace VirtualFriend
                 _renderEngine.BeginWorldSpace();
                 foreach (var obj in _gameObjects)
                 {
-                    obj.Draw(_renderEngine, _resourceManager);
+                    if (!(obj is WindowZoneObject))
+                    {
+                        obj.Draw(_renderEngine, _resourceManager);
+                    }
                 }
                 _renderEngine.EndWorldSpace();
+
+                var activeWindows = _windowManager.GetActiveWindowObjects();
+                foreach (var obj in _gameObjects)
+                {
+                    if (obj is WindowZoneObject windowZone)
+                    {
+                        // Вызываем кастомный метод отрисовки, передавая ему список всех окон для анализа
+                        windowZone.DrawWithMasking(_renderEngine, _resourceManager, activeWindows);
+                    }
+                }
 
                 // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
                 _renderEngine.DrawTextWithShadow($"Коробок: {_gameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
