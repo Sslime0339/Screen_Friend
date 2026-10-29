@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="1. Тест прозрачность/1. Тест прозрачность.csproj" Id="bafbbae0-5e00-4348-ba85-7b66126274fa" />
   <Project Path="Тест Raylib_cs/Тест Raylib_cs.csproj" Id="2a5da123-9f8a-4a6e-992e-c7bdf28a95f2" />
   <Project Path="Тест sharpHook Втрой/Тест sharpHook Втрой ящики.csproj" Id="c1c24fa3-677f-4ed4-b8cb-3924945beda7" />
   <Project Path="Тест SharpHook/Тест SharpHook.csproj" Id="bd99c7b7-624a-4c40-aa36-012a1bf9c410" />
