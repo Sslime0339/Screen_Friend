@@ -10,8 +10,11 @@ namespace VirtualFriend.Scripts.GameObjects
         public Body PhysicsBody { get; protected set; }
         public bool IsDestroyed { get; protected set; }
 
-        // Добавляем слой отрисовки. По умолчанию пусть будет средний слой мира
+        // Первое число: Глобальный слой
         public DrawLayer Layer { get; set; } = DrawLayer.DynamicObjects;
+
+        // Второе число: Порядок внутри этого слоя (Z-Index)
+        public int ZIndex { get; set; } = 0;
 
         public abstract void Update(float dt);
         public abstract void Draw(RenderEngine renderer, ResourceManager resourceManager);

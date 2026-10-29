@@ -127,9 +127,18 @@ namespace VirtualFriend
                 // Шаг физического мира
                 _physicsSystem.Step(dt);
 
-                // --- СОРТИРОВКА ОТРИСОВКИ ---
-                // Сортируем список объектов по значению слоя перед тем, как начать рисовать
-                _gameObjects.Sort((a, b) => a.Layer.CompareTo(b.Layer));
+
+                // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
+                _gameObjects.Sort((a, b) =>
+                {
+                    // 1. Сначала сравниваем по слою (Layer)
+                    int layerCompare = a.Layer.CompareTo(b.Layer);
+                    if (layerCompare != 0) return layerCompare;
+
+                    // 2. Если слои равны, сортируем по внутреннему ZIndex
+                    return a.ZIndex.CompareTo(b.ZIndex);
+                });
+
 
                 // Отрисовка сцены
                 _renderEngine.Begin(Color.Blank);

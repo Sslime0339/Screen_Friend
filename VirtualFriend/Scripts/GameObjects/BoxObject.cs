@@ -55,7 +55,7 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.AngularVelocity = 0f;
 
             // ЭФФЕКТ: Приподнимаем коробку над остальными во время перетаскивания
-            Layer = DrawLayer.Characters;
+            // Layer = DrawLayer.Characters;
         }
 
         public void OnDrag(XnaVector targetWorldPos, float responsiveness)
@@ -80,13 +80,34 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.LinearVelocity = releaseVelocity;
 
             // Возвращаем обычный слой, когда бросили
-            Layer = DrawLayer.DynamicObjects;
+            // Layer = DrawLayer.DynamicObjects;
         }
 
         // --- Стандартные методы GameObject ---
 
+
         public override void Update(float dt)
         {
+            if (PhysicsBody == null || IsDestroyed) return;
+
+            // Берем текущие координаты ящика из физического тела
+            float x = PhysicsBody.Position.X;
+            float y = PhysicsBody.Position.Y;
+
+            //float Cos5 = (float)Math.Cos(5.0 * Math.PI / 180.0);
+            //float Sin5 = (float)Math.Sin(5.0 * Math.PI / 180.0);
+
+            // Считаем проекцию по вашей формуле
+            //float rawSortKey = y * Cos5 - x * Sin5;
+            //object.screenY + (object.screenX * 0.087);
+
+            float halfSize = _size / 2f;
+
+            float rawSortKey = (y) - (x);
+
+            // Инвертируем, чтобы верхние объекты (меньший Y) имели больший ZIndex и рисовались позже (поверх)
+            // Умножаем на 10000 для сохранения точности float при конвертации в int
+            ZIndex = (int)(-rawSortKey * 10000f);
         }
 
         public override void Draw(RenderEngine renderer, ResourceManager resourceManager)
