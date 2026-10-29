@@ -73,6 +73,45 @@ class Program
         public int Bottom;
     }
 
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    private const int GWL_STYLE = -16;
+    private const int WS_DISABLED = 0x08000000;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public POINT ptMinPosition;
+        public POINT ptMaxPosition;
+        public RECT rcNormalPosition;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     private static bool _isRunning = true;
     private static object _lock = new object();
     private static float PixelsPerMeter = 1000f;
@@ -95,7 +134,7 @@ class Program
                     // 1. Базовая проверка видимости и свернутости
                     if (!IsWindowVisible(hWnd) || IsIconic(hWnd)) return true;
 
-                    // 2. Исключаем Shell-окно (тот самый Program Manager)
+                    // 2. Исключаем Shell-окно (рабочий стол)
                     if (hWnd == shellWindow) return true;
 
                     // 3. Получаем заголовок окна
@@ -108,26 +147,33 @@ class Program
                     DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
                     if (isCloaked) return true;
 
-                    // 5. Фильтрация по имени системного класса Windows
+                    // 5. Фильтрация по стилям (отсекаем отключенные окна, это убирает замороженные UWP)
+                    int style = GetWindowLong(hWnd, GWL_STYLE);
+                    if ((style & WS_DISABLED) != 0) return true;
+
+                    // 6. Проверка WindowPlacement (Убирает скрытые/приостановленные окна Windows Store)
+                    WINDOWPLACEMENT placement = new WINDOWPLACEMENT();
+                    placement.length = Marshal.SizeOf(placement);
+                    if (GetWindowPlacement(hWnd, ref placement))
+                    {
+                        // showCmd == 0 означает SW_HIDE (окно скрыто фоновым процессом)
+                        if (placement.showCmd == 0) return true;
+                    }
+
+                    // 7. Фильтрация по имени системного класса Windows
                     StringBuilder sbClass = new StringBuilder(256);
                     GetClassName(hWnd, sbClass, sbClass.Capacity);
                     string className = sbClass.ToString();
 
-                    // Отсекаем служебные классы Windows, которые не должны быть в оверлее
-                    if (className == "ApplicationFrameWindow" && title == "Настройки")
-                    {
-                        // Некоторые фоновые окна настроек UWP имеют видимый размер, но скрыты
-                        // Дополнительная проверка на фантомность окна UWP
-                    }
                     if (className == "Windows.UI.Core.CoreWindow" ||
                         className == "Progman" ||
                         className == "WorkerW") return true;
 
-                    // 6. Исключаем Tool-окна (панели инструментов, скрытые фоновые утилиты)
+                    // 8. Исключаем Tool-окна (панели инструментов)
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
                     if ((exStyle & WS_EX_TOOLWINDOW) != 0) return true;
 
-                    // 7. Получаем точные координаты и размеры окна
+                    // 9. Получаем точные координаты и размеры окна
                     if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
 
                     int width = rect.Right - rect.Left;
@@ -139,7 +185,7 @@ class Program
                     if (width <= 16 || height <= 16) return true;
                     if (x < -10000 || y < -10000) return true;
 
-                    // Если все проверки пройдены — окно считается валидным и пользовательским
+                    // Если все жесткие проверки пройдены
                     zCounter++;
                     bool isMaximized = IsZoomed(hWnd);
 
@@ -157,6 +203,7 @@ class Program
 
                     return true;
                 }, IntPtr.Zero);
+
 
                 lock (_lock)
                 {
