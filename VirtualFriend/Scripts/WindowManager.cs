@@ -81,18 +81,24 @@ namespace VirtualFriend.Scripts
                     // Если окно уже существует в игровом мире
                     if (data.IsMinimized)
                     {
-                        // TODO: Вызовите метод скрытия вашего объекта, например:
-                        // existingWindow.Hide(); 
-                        // или existingWindow.SetActive(false);
-                        // Также желательно временно отключать его физическое тело в VelcroPhysics, если это необходимо
+                        if (existingWindow.IsShow)
+                        {
+                            // TODO: Вызовите метод скрытия вашего объекта, например:
+                            existingWindow.Hide();
+                            // или existingWindow.SetActive(false);
+                            // Также желательно временно отключать его физическое тело в VelcroPhysics, если это необходимо
+                        }
                     }
                     else
-                    {
-                        // Если окно вернулось из свёрнутого состояния — показываем его обратно
-                        // existingWindow.Show(); 
-                        // или existingWindow.SetActive(true);
+                    { 
+                        if (!existingWindow.IsShow)
+                        {
+                            // Если окно вернулось из свёрнутого состояния — показываем его обратно
+                            existingWindow.Show();
+                            // или existingWindow.SetActive(true);
 
-                        // Если окно активно — обновляем его параметры в игровом движке
+                            // Если окно активно — обновляем его параметры в игровом движке
+                        }
                         existingWindow.UpdatePositionAndSize(data);
                     }
                 }

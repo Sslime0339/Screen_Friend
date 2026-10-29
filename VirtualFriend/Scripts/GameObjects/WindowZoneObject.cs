@@ -15,10 +15,12 @@ namespace VirtualFriend.Scripts.GameObjects
         public float Width { get; private set; }
         public float Height { get; private set; }
         public SysVector Center { get; private set; }
+        public bool IsShow { get; private set; }
 
         private readonly List<GameObject> _microObjects = new List<GameObject>();
         private readonly List<Body> _innerWalls = new List<Body>();
         private readonly World _localWorld;
+        private readonly World _bodyWorld;
 
         // Холст для рисования микромира текущего окна
         private RenderTexture2D _canvas;
@@ -33,11 +35,10 @@ namespace VirtualFriend.Scripts.GameObjects
             Center = new SysVector(data.CenterX, data.CenterY);
             ZIndex = data.ZIndex; // Сохраняем ZIndex
             _ppm = ppm;
+            _bodyWorld = world;
 
             _localWorld = new World(new Microsoft.Xna.Framework.Vector2(0f, 19.6f));
 
-            PhysicsBody = BodyFactory.CreateRectangle(world, Width, Height, 1f, new XnaVector(Center.X, Center.Y));
-            PhysicsBody.BodyType = BodyType.Static;
 
             BuildInnerBoundaries(_localWorld);
             SpawnMicroWorldContents(_localWorld);
@@ -47,6 +48,18 @@ namespace VirtualFriend.Scripts.GameObjects
             // Инициализируем текстуру под размер экрана оверлея
             InitCanvas();
         }
+
+        private void CreateOuterBody(World world)
+        {
+            PhysicsBody = BodyFactory.CreateRectangle(world, Width, Height, 1f, new XnaVector(Center.X, Center.Y));
+            PhysicsBody.BodyType = BodyType.Static;
+        }
+
+        private void DeleteOuterBody()
+        {
+            PhysicsBody.RemoveFromWorld();
+        }
+
 
         private void InitCanvas()
         {
@@ -155,7 +168,7 @@ namespace VirtualFriend.Scripts.GameObjects
         // В метод Draw передаем список всех активных окон для вычисления перекрытия
         public void DrawWithMasking(RenderEngine renderer, ResourceManager resourceManager, List<WindowZoneObject> allWindows)
         {
-            if (!_isCanvasInitialized || IsDestroyed) return;
+            if (!_isCanvasInitialized || IsDestroyed || !IsShow) return;
 
             // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace (камера оверлея)
             Raylib.BeginTextureMode(_canvas);
@@ -228,5 +241,24 @@ namespace VirtualFriend.Scripts.GameObjects
 
             base.Destroy(world);
         }
+
+
+
+
+        public void Hide()
+        {
+            if (!IsShow) throw new Exception("Окно уже скрыто");
+            IsShow = false;
+            DeleteOuterBody();
+        }
+
+        public void Show()
+        {
+            if (IsShow) throw new Exception("Окно уже показано");
+            IsShow = true;
+            CreateOuterBody(_bodyWorld);
+        }
+
+
     }
 }
