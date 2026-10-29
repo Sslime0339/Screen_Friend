@@ -102,7 +102,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
         private void BuildInnerBoundaries(World world)
         {
-            float thickness = 5f;
+            float thickness = 50f;
             var floor = BodyFactory.CreateRectangle(world, Width * 2, thickness, 1f, new XnaVector(Center.X, Center.Y + Height / 2f + thickness / 2));
             floor.BodyType = BodyType.Static;
             _innerWalls.Add(floor);
@@ -176,7 +176,7 @@ namespace VirtualFriend.Scripts.GameObjects
             }
         }
 
-        // В метод Draw передаем список всех активных окон для вычисления перекрытия
+                // В метод Draw передаем список всех активных окон для вычисления перекрытия
         public void DrawWithMasking(RenderEngine renderer, ResourceManager resourceManager, List<WindowZoneObject> allWindows)
         {
             if (!_isCanvasInitialized || IsDestroyed || !IsShow) return;
@@ -185,6 +185,18 @@ namespace VirtualFriend.Scripts.GameObjects
             Raylib.BeginTextureMode(_canvas);
             Raylib.ClearBackground(Color.Blank); // Полностью прозрачный холст
 
+            // --- ДОБАВЛЕНО: ОБРЕЗКА ПО ГРАНИЦАМ ТЕКУЩЕГО ОКНА ---
+            // Вычисляем экранные координаты текущего окна для Scissor Test
+            float thisScreenW = Width * _ppm;
+            float thisScreenH = Height * _ppm;
+            float thisScreenX = (Center.X * _ppm) - (thisScreenW / 2f);
+            // Так как мы рисуем НА RenderTexture, физический верх и низ инвертированы относительно экрана.
+            // Но Raylib-cs автоматически учитывает это при Scissor Mode внутри TextureMode. 
+            // Если возникнет сдвиг по вертикали, может потребоваться инвертировать Y: (Raylib.GetScreenHeight() - ...)
+            float thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
+
+            // Активируем обрезку (все, что за пределами этого прямоугольника, не запишется в текстуру)
+            Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
 
             // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
             _microObjects.Sort((a, b) =>
@@ -203,6 +215,10 @@ namespace VirtualFriend.Scripts.GameObjects
                 obj.Draw(renderer, resourceManager);
             }
             renderer.EndWorldSpace();
+
+            // Выключаем обрезку по границам текущего окна
+            Raylib.EndScissorMode();
+
 
             // ШАГ 2: Вырезаем области окон, которые находятся ВЫШЕ текущего окна (ZIndex меньше)
             Raylib.BeginBlendMode(BlendMode.Custom); // Включаем стирание контента
@@ -245,6 +261,7 @@ namespace VirtualFriend.Scripts.GameObjects
             renderer.DrawTextWithShadow($"{this.Hwnd}", new SysVector((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm), 24, Color.White);
 #endif
         }
+
 
         public override void Draw(RenderEngine renderer, ResourceManager resourceManager)
         {
