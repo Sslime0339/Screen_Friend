@@ -22,6 +22,9 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.BodyType = BodyType.Dynamic;
             PhysicsBody.Restitution = 0.2f;
             PhysicsBody.Friction = 0.6f;
+
+            // Указываем базовый слой для коробок
+            Layer = DrawLayer.DynamicObjects;
         }
 
         // --- Реализация интерфейса IClickable ---
@@ -50,6 +53,9 @@ namespace VirtualFriend.Scripts.GameObjects
             // Обнуляем старые скорости, чтобы коробка мгновенно перешла под контроль
             PhysicsBody.LinearVelocity = XnaVector.Zero;
             PhysicsBody.AngularVelocity = 0f;
+
+            // ЭФФЕКТ: Приподнимаем коробку над остальными во время перетаскивания
+            Layer = DrawLayer.Characters;
         }
 
         public void OnDrag(XnaVector targetWorldPos, float responsiveness)
@@ -72,6 +78,9 @@ namespace VirtualFriend.Scripts.GameObjects
             if (PhysicsBody == null) return;
             // Передаем финальное ускорение от броска руки
             PhysicsBody.LinearVelocity = releaseVelocity;
+
+            // Возвращаем обычный слой, когда бросили
+            Layer = DrawLayer.DynamicObjects;
         }
 
         // --- Стандартные методы GameObject ---

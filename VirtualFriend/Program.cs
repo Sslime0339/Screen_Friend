@@ -127,6 +127,9 @@ namespace VirtualFriend
                 // Шаг физического мира
                 _physicsSystem.Step(dt);
 
+                // --- СОРТИРОВКА ОТРИСОВКИ ---
+                // Сортируем список объектов по значению слоя перед тем, как начать рисовать
+                _gameObjects.Sort((a, b) => a.Layer.CompareTo(b.Layer));
 
                 // Отрисовка сцены
                 _renderEngine.Begin(Color.Blank);
@@ -138,7 +141,7 @@ namespace VirtualFriend
                 }
                 _renderEngine.EndWorldSpace();
 
-                // Отрисовка UI текста
+                // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
                 _renderEngine.DrawTextWithShadow($"Коробок: {_gameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
 
                 _renderEngine.End();

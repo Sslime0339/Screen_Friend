@@ -7,12 +7,11 @@ namespace VirtualFriend.Scripts.GameObjects
 {
     internal abstract class GameObject
     {
-
-        // Ссылка на физическое тело (может быть null, если объект нефизичный, например UI)
         public Body PhysicsBody { get; protected set; }
-
-        // Флаг для удаления объекта из игры
         public bool IsDestroyed { get; protected set; }
+
+        // Добавляем слой отрисовки. По умолчанию пусть будет средний слой мира
+        public DrawLayer Layer { get; set; } = DrawLayer.DynamicObjects;
 
         public abstract void Update(float dt);
         public abstract void Draw(RenderEngine renderer, ResourceManager resourceManager);
@@ -23,7 +22,6 @@ namespace VirtualFriend.Scripts.GameObjects
             if (PhysicsBody != null)
             {
                 PhysicsBody.RemoveFromWorld();
-                //world.DestroyBody(PhysicsBody);
                 PhysicsBody = null;
             }
         }

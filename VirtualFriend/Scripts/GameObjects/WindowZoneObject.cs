@@ -38,6 +38,8 @@ namespace VirtualFriend.Scripts.GameObjects
 
             // 3. Инициализируем микромир
             SpawnMicroWorldContents(_localWorld);
+
+            this.Layer = DrawLayer.Background;
         }
 
         // Метод динамического обновления положения физических границ
