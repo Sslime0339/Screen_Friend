@@ -95,6 +95,23 @@ namespace VirtualFriend.Scripts
                     Raylib.SetWindowState(ConfigFlags.MousePassthroughWindow);
                 }
             }
+
+
+
+            // считываем состояние ЛКМ один раз за кадр:
+            bool currentDown = (Win32Native.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+
+            // Кнопка нажата именно в этом кадре (сейчас зажата, а в прошлом кадре — нет)
+            _isLButtonPressed = currentDown && !_wasLButtonDownLastFrame;
+
+            // Кнопка отпущена именно в этом кадре (сейчас НЕ зажата, а в прошлом — была)
+            _isLButtonReleased = !currentDown && _wasLButtonDownLastFrame;
+
+            // Текущее состояние зажатия
+            _isLButtonDown = currentDown;
+
+            // Сохраняем состояние для следующего кадра
+            _wasLButtonDownLastFrame = currentDown;
         }
 
         public bool IsExitPressed() => (Win32Native.GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
@@ -114,24 +131,11 @@ namespace VirtualFriend.Scripts
             _wasXPressed = isDown;
             return pressed;
         }
+        public bool IsLButtonDown() => _isLButtonDown;
 
-        public bool IsLButtonDown() => (Win32Native.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+        public bool IsLButtonPressed() => _isLButtonPressed;
 
-        public bool IsLButtonPressed()
-        {
-            bool isDown = IsLButtonDown();
-            bool pressed = isDown && !_wasLButtonPressed;
-            _wasLButtonPressed = isDown;
-            return pressed;
-        }
-
-        public bool IsLButtonReleased()
-        {
-            bool isDown = IsLButtonDown();
-            bool released = !isDown && _wasLButtonPressed;
-            _wasLButtonPressed = isDown;
-            return released;
-        }
+        public bool IsLButtonReleased() => _isLButtonReleased;
 
         public SysVector GetMouseWorldPosition()
         {

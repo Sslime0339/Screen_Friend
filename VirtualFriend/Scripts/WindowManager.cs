@@ -79,7 +79,7 @@ namespace VirtualFriend.Scripts
             }
         }
 
-        public void StartScanning(int workAreaWidth, int workAreaHeight, int screenWidth, int screenHeight)
+        public void StartScanning(int workAreaWidth, int workAreaHeight, int screenWidth, int screenHeight, IntPtr ReylibHWnd)
         {
             _ = Task.Run(async () =>
             {
@@ -93,6 +93,11 @@ namespace VirtualFriend.Scripts
 
                     Win32Native.EnumWindows((hWnd, lParam) =>
                     {
+
+                        // Проверка что окно не является самим окном Raylib
+                        if (hWnd == ReylibHWnd) return true;
+
+
                         // 1. Базовая проверка видимости WinAPI и свернутости
                         if (!Win32Native.IsWindowVisible(hWnd) || Win32Native.IsIconic(hWnd)) return true;
 
@@ -150,23 +155,27 @@ namespace VirtualFriend.Scripts
                         }
 
                         // 10. Проверка на соответствие размерам рабочего стола или экрана
-                        if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
-                        {
-                            if (!Win32Native.IsZoomed(hWnd))
-                            {
-                                zCounter++;
+                        //if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
+                        //{
+                            //if (!Win32Native.IsZoomed(hWnd))
+                            //{
 
-                                currentWindows.Add(new WindowData
-                                {
-                                    Hwnd = hWnd,
-                                    Width = width / _pixelsPerMeter,
-                                    Height = height / _pixelsPerMeter,
-                                    CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,
-                                    CenterY = (rect.Top + height / 2f) / _pixelsPerMeter,
-                                    ZIndex = zCounter
-                                });
-                            }
-                        }
+
+
+
+                        zCounter++;
+
+                        currentWindows.Add(new WindowData
+                        {
+                            Hwnd = hWnd,
+                            Width = width / _pixelsPerMeter,
+                            Height = height / _pixelsPerMeter,
+                            CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,
+                            CenterY = (rect.Top + height / 2f) / _pixelsPerMeter,
+                            ZIndex = zCounter
+                        });
+                            //}
+                        //}
                         return true;
                     }, IntPtr.Zero);
 

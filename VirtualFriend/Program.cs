@@ -74,6 +74,13 @@ namespace VirtualFriend
             Raylib.InitWindow(workAreaWidth, workAreaHeight, "Raylib-cs + Velcro Physics overlay");
             Raylib.SetTargetFPS(60);
 
+            IntPtr ReylibHWnd;
+            
+            unsafe
+            {
+                ReylibHWnd = (IntPtr)Raylib.GetWindowHandle();
+            }
+
 
 
             const float ppm = 50f; // Pixels Per Meter
@@ -93,7 +100,7 @@ namespace VirtualFriend
 
 
             _windowManager = new WindowManager(_physicsSystem.World, ppm);
-            _windowManager.StartScanning(workAreaWidth, workAreaHeight, screenWidth, screenHeight);
+            _windowManager.StartScanning(workAreaWidth, workAreaHeight, screenWidth, screenHeight, ReylibHWnd);
 
 
             _inputManager = new InputManager(_renderEngine);
@@ -101,7 +108,8 @@ namespace VirtualFriend
 
 
 
-            GameObjectFactory.Instance.CreateBox(_physicsSystem.World, new SysVector(30, 5), 5);
+            GameObject newObj = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, new SysVector(30, 5), 5);
+            _desktopGameObjects.Add(newObj);
 
 
 
@@ -246,7 +254,6 @@ namespace VirtualFriend
             // 2. СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
             else if (_inputManager.IsLButtonReleased() && _draggedObject != null)
             {
-                Console.WriteLine("Отпустил");
 
                 float launchModifier = 1.0f;
                 XnaVector releaseVelocity = new XnaVector(
@@ -254,16 +261,10 @@ namespace VirtualFriend
                     _inputManager.MouseWorldVelocity.Y * launchModifier
                 );
 
-                bool swallowedByWindow = false;
 
-                if (_draggedObject is GameObject) Console.WriteLine("класс нужный Gameobj");
-
-                if (_draggedObject is ITeleportable) Console.WriteLine("класс нужный ITelep");
-
-                if ((_draggedObject is GameObject boxObj) && (boxObj is ITeleportable))
+                // Перемещения объекта между окнами
+                if ((_draggedObject is GameObject boxObj) && (boxObj is ITeleportable teleportableObj))
                 {
-
-                    Console.WriteLine("класс нужный");
 
                     // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ: Получаем верхнее окно под мышкой
                     WindowZoneObject topWindow = GetTopWindowUnderMouse(currentMouseWorld);
@@ -271,24 +272,30 @@ namespace VirtualFriend
                     if (topWindow != null)
                     {
                         
-                        // если CurrentWindow == null то он находится на рабочем столе
-                        if (boxObj.CurrentWindow != null)
+                        if (boxObj.CurrentWindow != topWindow)
                         {
-                            boxObj.CurrentWindow.TeleportOut(boxObj);
+                            // если CurrentWindow == null то он находится на рабочем столе
+                            if (boxObj.CurrentWindow != null)
+                            {
+                                boxObj.CurrentWindow.TeleportOut(boxObj);
+                            }
+                            else
+                            {
+                                _desktopGameObjects.Remove(boxObj);
+                            }
+
+                            topWindow.TeleportIn(boxObj, currentMouseWorld, releaseVelocity);
+
+                            Console.WriteLine("Телепорт");
                         }
-                        else
-                        {
-                            _desktopGameObjects.Remove(boxObj);
-                        }
-
-                        Console.WriteLine("Телепорт");
-
-                        // Запихиваем ящик в найденное окно
-                        topWindow.TeleportIn(boxObj, currentMouseWorld, releaseVelocity);
-
-
-                        swallowedByWindow = true;
                     }
+                    else if (boxObj.CurrentWindow != null) // перемещаем на рабочий стол
+                    {
+                        boxObj.CurrentWindow.TeleportOut(boxObj);
+                        teleportableObj.TeleportToWorld(_physicsSystem.World, currentMouseWorld, releaseVelocity);
+                        _desktopGameObjects.Add(boxObj);
+                    }
+
                 }
 
                 _draggedObject.OnDragEnd(releaseVelocity);
