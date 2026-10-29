@@ -2,34 +2,32 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 
-
-
-
-
+// Расширенная структура для хранения данных об окне
 struct WindowData
 {
+    public string Title;
+    public IntPtr Handle;
+    public int ZIndex; // 1 — самое верхнее окно, 2 — под ним и так далее
+    public bool IsMaximized;
     public float Width;
     public float Height;
     public float CenterX;
     public float CenterY;
 }
 
-
-
-
-
 class Program
 {
+    // Сигнатура делегата для перечисления окон
     delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc enumFunc, IntPtr lParam);
 
-    // Возвращает true, если окно развёрнуто на весь экран
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool IsZoomed(IntPtr hWnd);
+    public static extern bool IsZoomed(IntPtr hWnd); // True, если окно развернуто на весь экран
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
@@ -38,41 +36,22 @@ class Program
     private static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
-    private static extern bool IsIconic(IntPtr hWnd);
+    private static extern bool IsIconic(IntPtr hWnd); // True, если окно свернуто
 
-    //[DllImport("user32.dll")]
-    //[return: MarshalAs(UnmanagedType.Bool)]
-    //private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-
-
-    // Константа, указывающая, что нам нужны точные видимые границы окна
     private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+    private const int DWMWA_CLOAKED = 14;
 
-    // Импорт функции из dwmapi.dll
     [DllImport("dwmapi.dll")]
-    private static extern int DwmGetWindowAttribute(
-        IntPtr hwnd,
-        int dwAttribute,
-        out RECT pvAttribute,
-        int cbAttribute
-    );
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
 
-    // Удобный метод-обёртка
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out bool pvAttribute, int cbAttribute);
+
     public static bool GetExactWindowRect(IntPtr hWnd, out RECT rect)
     {
-        // Передаем размер структуры в байтах (cbAttribute)
-        int result = DwmGetWindowAttribute(
-            hWnd,
-            DWMWA_EXTENDED_FRAME_BOUNDS,
-            out rect,
-            Marshal.SizeOf(typeof(RECT))
-        );
-
-        // В WinAPI 0 (S_OK) означает успех
+        int result = DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out rect, Marshal.SizeOf(typeof(RECT)));
         return result == 0;
     }
-
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
@@ -83,35 +62,41 @@ class Program
         public int Bottom;
     }
 
+    // Управляющие переменные (заглушки из вашего кода для работоспособности)
+    private static bool _isRunning = true;
+    private static object _lock = new object();
+    private static float PixelsPerMeter = 1000f; // Коэффициент перевода пикселей в "метры"
 
-
-
-    static void Main()
+    static async Task Main()
     {
+        Console.OutputEncoding = Encoding.UTF8;
+        List<WindowData> windowList = new List<WindowData>();
 
-        List<string> windowList = new List<string>();
-
-
-        // Запускаем фоновую задачу бесконечного сканирования окон ОС
+        // Запускаем фоновую задачу сканирования окон ОС
         _ = Task.Run(async () =>
         {
-            const int DWMWA_CLOAKED = 14;
-
             while (_isRunning)
             {
                 List<WindowData> currentWindows = new List<WindowData>();
+                int zCounter = 0; // Счетчик для определения Z-порядка
 
                 EnumWindows((hWnd, lParam) =>
                 {
+                    // 1. Базовые проверки на видимость
                     if (!IsWindowVisible(hWnd)) return true;
+                    if (IsIconic(hWnd)) return true; // Пропускаем свернутые
+
+                    // 2. Получаем заголовок окна
                     StringBuilder sb = new StringBuilder(256);
                     GetWindowText(hWnd, sb, sb.Capacity);
                     string title = sb.ToString();
                     if (string.IsNullOrWhiteSpace(title)) return true;
 
+                    // 3. Проверка на "скрытые" (Cloaked) окна Windows (например, окна на других виртуальных рабочих столах)
                     DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
                     if (isCloaked) return true;
 
+                    // 4. Получаем точные координаты
                     if (!GetExactWindowRect(hWnd, out RECT rect)) return true;
 
                     int width = rect.Right - rect.Left;
@@ -119,87 +104,67 @@ class Program
                     int x = rect.Left;
                     int y = rect.Top;
 
+                    // Фильтрация системного мусора и фантомных окон
                     if (width <= 16 || height <= 16) return true;
                     if (x < -10000 || y < -10000) return true;
 
-                    // Исключаем само окно оверлея
-                    if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
+                    // Увеличиваем Z-индекс. Так как EnumWindows идет сверху вниз,
+                    // первое валидное окно получит ZIndex = 1 (самое верхнее).
+                    zCounter++;
+
+                    // Проверяем, развернуто ли окно на весь экран
+                    bool isMaximized = IsZoomed(hWnd);
+
+                    currentWindows.Add(new WindowData
                     {
-                        if (!IsZoomed(hWnd) && !IsIconic(hWnd))
-                        {
-                            currentWindows.Add(new WindowData
-                            {
-                                Width = width / PixelsPerMeter,
-                                Height = height / PixelsPerMeter,
-                                CenterX = (x + width / 2f) / PixelsPerMeter,
-                                CenterY = (y + height / 2f) / PixelsPerMeter
-                            });
-                        }
-                    }
+                        Title = title,
+                        Handle = hWnd,
+                        ZIndex = zCounter,
+                        IsMaximized = isMaximized,
+                        Width = width / PixelsPerMeter,
+                        Height = height / PixelsPerMeter,
+                        CenterX = (x + width / 2f) / PixelsPerMeter,
+                        CenterY = (y + height / 2f) / PixelsPerMeter
+                    });
+
                     return true;
                 }, IntPtr.Zero);
 
-                // Быстро и безопасно переносим данные в основной поток
+                // Синхронизируем и обновляем основной список
                 lock (_lock)
                 {
                     windowList = currentWindows;
                 }
 
-                // Пауза 100 мс (хватит для плавной физики окон, разгрузит процессор на 99%)
                 await Task.Delay(100);
             }
         });
 
-
-
-        /*
-        EnumWindows((hWnd, lParam) =>
+        // Поток для вывода информации в консоль
+        while (_isRunning)
         {
-            // Проверка на свёрнуто ли окно
-            bool isNotMinimized = !IsIconic(hWnd);
+            Console.Clear();
+            Console.WriteLine($"=== Список активных окон (Всего: {windowList.Count}) ===");
+            Console.WriteLine($"{"Z-Index",-9} | {"На весь экран?",-15} | {"Размеры (М)",-15} | {"Заголовок"}");
+            Console.WriteLine(new string('-', 80));
 
-            int width = 0;
-            int height = 0;
-
-            int x = 0;
-            int y = 0;
-
-            // Использование:
-            if (GetExactWindowRect(hWnd, out RECT rect))
+            List<WindowData> localList;
+            lock (_lock)
             {
-                width = rect.Right - rect.Left;
-                height = rect.Bottom - rect.Top;
-                x = rect.Left;
-                y = rect.Top;
-                //int x = rect.Left
-                //int y = 
-                //Console.WriteLine($"Размеры окна: {width}x{height}");
+                // Делаем копию для безопасного вывода без блокировки на время отрисовки
+                localList = new List<WindowData>(windowList);
             }
 
-
-
-            if (IsWindowVisible(hWnd))
+            foreach (var win in localList)
             {
-                StringBuilder sb = new StringBuilder(256);
-                int length = GetWindowText(hWnd, sb, sb.Capacity);
-                string title = sb.ToString();
+                string maximizedStatus = win.IsMaximized ? "ДА" : "Нет";
+                string sizeStr = $"{win.Width:F2}x{win.Height:F2}";
 
-                if (!string.IsNullOrWhiteSpace(title))
-                {
-                    windowList.Add($"[{isNotMinimized}] [Zoom:{IsZoomed(hWnd)}] [{x}:{y}] [{width};{height}] {hWnd}: {title}");
-
-                }
+                Console.WriteLine($"{win.ZIndex,-9} | {maximizedStatus,-15} | {sizeStr,-15} | {win.Title}");
             }
-            return true;
-        }, IntPtr.Zero);
 
-        
-        foreach (var win in windowList)
-        {
-            Console.WriteLine(win);
-        }*/
-        
+            // Обновляем отображение в консоли раз в секунду, чтобы она не мерцала слишком часто
+            await Task.Delay(1000);
+        }
     }
-
-
 }
