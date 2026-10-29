@@ -45,7 +45,9 @@ namespace VirtualFriend
 
 
 
-        private static readonly List<GameObject> _gameObjects = new List<GameObject>();
+        private static readonly List<GameObject> _allGameObjects = new List<GameObject>();
+
+        private static readonly List<GameObject> _desktopGameObjects = new List<GameObject>();
         private static bool _isRunning = true;
 
         // ИСПОЛЬЗУЕМ ИНТЕРФЕЙС: Храним ссылку на любой таскаемый объект
@@ -87,7 +89,7 @@ namespace VirtualFriend
             InitWalls(ppm);
 
 
-            GameObjectFactory.Initialize(_gameObjects);
+            GameObjectFactory.Initialize(_allGameObjects);
 
 
             _windowManager = new WindowManager(_physicsSystem.World, ppm);
@@ -110,16 +112,16 @@ namespace VirtualFriend
                 float dt = Raylib.GetFrameTime();
 
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
-                _inputManager.Update(_gameObjects, dt);
+                _inputManager.Update(_allGameObjects, dt);
 
                 // --- Логика управления ящиками и объектами ---
                 HandleInput();
 
                 // Обновление логики объектов
-                for (int i = _gameObjects.Count - 1; i >= 0; i--)
+                for (int i = _allGameObjects.Count - 1; i >= 0; i--)
                 {
-                    _gameObjects[i].Update(dt);
-                    if (_gameObjects[i].IsDestroyed) _gameObjects.RemoveAt(i);
+                    _allGameObjects[i].Update(dt);
+                    if (_allGameObjects[i].IsDestroyed) _allGameObjects.RemoveAt(i);
                 }
 
                 _windowManager.Update(ppm);
@@ -129,7 +131,7 @@ namespace VirtualFriend
 
 
                 // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
-                _gameObjects.Sort((a, b) =>
+                _allGameObjects.Sort((a, b) =>
                 {
                     // 1. Сначала сравниваем по слою (Layer)
                     int layerCompare = a.Layer.CompareTo(b.Layer);
@@ -144,7 +146,7 @@ namespace VirtualFriend
                 _renderEngine.Begin(Color.Blank);
 
                 _renderEngine.BeginWorldSpace();
-                foreach (var obj in _gameObjects)
+                foreach (var obj in _desktopGameObjects)
                 {
                     if (!(obj is WindowZoneObject))
                     {
@@ -154,17 +156,14 @@ namespace VirtualFriend
                 _renderEngine.EndWorldSpace();
 
                 var activeWindows = _windowManager.GetActiveWindowObjects();
-                foreach (var obj in _gameObjects)
+                foreach (var obj in _windowManager.GetActiveWindowObjects())
                 {
-                    if (obj is WindowZoneObject windowZone)
-                    {
-                        // Вызываем кастомный метод отрисовки, передавая ему список всех окон для анализа
-                        windowZone.DrawWithMasking(_renderEngine, _resourceManager, activeWindows);
-                    }
+                    // Вызываем кастомный метод отрисовки, передавая ему список всех окон для анализа
+                    obj.DrawWithMasking(_renderEngine, _resourceManager, activeWindows);
                 }
 
                 // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
-                _renderEngine.DrawTextWithShadow($"Коробок: {_gameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
+                _renderEngine.DrawTextWithShadow($"Коробок: {_allGameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
 
                 _renderEngine.End();
 
@@ -203,13 +202,13 @@ namespace VirtualFriend
                 SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
                 float boxSize = 1.0f;
                 BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
-                _gameObjects.Add(newBox);
+                _desktopGameObjects.Add(newBox);
             }
 
             // --- 2. Очистка сцены (Клавиша X) ---
             if (_inputManager.IsClearPressed())
             {
-                foreach (var obj in _gameObjects)
+                foreach (var obj in _allGameObjects)
                 {
                     if (obj is BoxObject)
                     {
@@ -226,7 +225,7 @@ namespace VirtualFriend
             // 1. СОБЫТИЕ: Клик только что произошел (Нажатие кнопки)
             if (_inputManager.IsLButtonPressed() && _draggedObject == null)
             {
-                foreach (var obj in _gameObjects)
+                foreach (var obj in _allGameObjects)
                 {
                     // Проверяем, поддерживает ли объект перетаскивание
                     if (obj is IDraggable draggable)
@@ -247,16 +246,55 @@ namespace VirtualFriend
             // 2. СОБЫТИЕ: Кнопка мыши отпущена (Бросок)
             else if (_inputManager.IsLButtonReleased() && _draggedObject != null)
             {
+                Console.WriteLine("Отпустил");
+
                 float launchModifier = 1.0f;
                 XnaVector releaseVelocity = new XnaVector(
                     _inputManager.MouseWorldVelocity.X * launchModifier,
                     _inputManager.MouseWorldVelocity.Y * launchModifier
                 );
 
-                // Оповещаем объект об окончании перетаскивания и передаем скорость броска
+                bool swallowedByWindow = false;
+
+                if (_draggedObject is GameObject) Console.WriteLine("класс нужный Gameobj");
+
+                if (_draggedObject is ITeleportable) Console.WriteLine("класс нужный ITelep");
+
+                if ((_draggedObject is GameObject boxObj) && (boxObj is ITeleportable))
+                {
+
+                    Console.WriteLine("класс нужный");
+
+                    // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ: Получаем верхнее окно под мышкой
+                    WindowZoneObject topWindow = GetTopWindowUnderMouse(currentMouseWorld);
+
+                    if (topWindow != null)
+                    {
+                        
+                        // если CurrentWindow == null то он находится на рабочем столе
+                        if (boxObj.CurrentWindow != null)
+                        {
+                            boxObj.CurrentWindow.TeleportOut(boxObj);
+                        }
+                        else
+                        {
+                            _desktopGameObjects.Remove(boxObj);
+                        }
+
+                        Console.WriteLine("Телепорт");
+
+                        // Запихиваем ящик в найденное окно
+                        topWindow.TeleportIn(boxObj, currentMouseWorld, releaseVelocity);
+
+
+                        swallowedByWindow = true;
+                    }
+                }
+
                 _draggedObject.OnDragEnd(releaseVelocity);
                 _draggedObject = null;
             }
+
             // 3. СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание)
             else if (_inputManager.IsLButtonDown() && _draggedObject != null)
             {
@@ -324,6 +362,33 @@ namespace VirtualFriend
             rightWall.Restitution = 0.3f;
         }
 
+        private static WindowZoneObject GetTopWindowUnderMouse(SysVector mouseWorldPos)
+        {
+            List<WindowZoneObject> windowsUnderMouse = new List<WindowZoneObject>();
+
+            // Собираем все окна, в границы которых попадает курсор мыши
+            foreach (var win in _windowManager.GetActiveWindowObjects())
+            {
+                float halfW = win.Width / 2f;
+                float halfH = win.Height / 2f;
+
+                if (mouseWorldPos.X >= win.Center.X - halfW && mouseWorldPos.X <= win.Center.X + halfW &&
+                    mouseWorldPos.Y >= win.Center.Y - halfH && mouseWorldPos.Y <= win.Center.Y + halfH)
+                {
+                    windowsUnderMouse.Add(win);
+                }
+            }
+
+            // Если нашли окна под мышкой, сортируем по ZIndex и возвращаем самое верхнее (индекс 0)
+            if (windowsUnderMouse.Count > 0)
+            {
+                windowsUnderMouse.Sort((a, b) => a.ZIndex.CompareTo(b.ZIndex));
+                return windowsUnderMouse[0];
+            }
+
+            // Окон под курсором нет
+            return null;
+        }
 
 
     }

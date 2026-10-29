@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -7,8 +6,14 @@ namespace VirtualFriend.Scripts
 {
     internal static class Win32Native
     {
+        // Константы стилей и атрибутов
+        public const int GWL_STYLE = -16;
+        public const int GWL_EXSTYLE = -20;
+        public const int WS_DISABLED = 0x08000000;
+        public const int WS_EX_TOOLWINDOW = 0x00000080;
+        public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+        public const int DWMWA_CLOAKED = 14;
 
-        // --- WinAPI для работы с окнами ---
         public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
         [DllImport("user32.dll")]
@@ -27,10 +32,24 @@ namespace VirtualFriend.Scripts
         [DllImport("user32.dll")]
         public static extern bool IsIconic(IntPtr hWnd);
 
+        // --- Новые импорты для фильтрации фантомных и системных окон ---
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetShellWindow();
+
+        [DllImport("user32.dll")]
+        public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
         [DllImport("dwmapi.dll")]
         public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out bool pvAttribute, int cbAttribute);
 
-        private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
@@ -50,10 +69,16 @@ namespace VirtualFriend.Scripts
             public int Bottom;
         }
 
-
-
-
-
+        [StructLayout(LayoutKind.Sequential)]
+        public struct WINDOWPLACEMENT
+        {
+            public int length;
+            public int flags;
+            public int showCmd;
+            public Point ptMinPosition;
+            public Point ptMaxPosition;
+            public RECT rcNormalPosition;
+        }
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -61,31 +86,15 @@ namespace VirtualFriend.Scripts
 
         public struct Point { public int X; public int Y; }
 
-
-
-
-        // WinAPI для глобального отслеживания клавиш и мыши без хуков
         [DllImport("user32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
 
-
-
-
-
-
-        // Подключаем функцию из системной библиотеки Windows (User32.dll)
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
-
-
-
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SystemParametersInfo(int uiAction, int uiParam, ref RECT pvParam, int fWinIni);
 
-
-
-        // --- Дополнительное WinAPI для разворачивания ---
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     }

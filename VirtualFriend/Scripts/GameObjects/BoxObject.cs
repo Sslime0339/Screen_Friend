@@ -8,23 +8,48 @@ using XnaVector = Microsoft.Xna.Framework.Vector2;
 namespace VirtualFriend.Scripts.GameObjects
 {
     // Добавили наследование интерфейса IDraggable
-    internal class BoxObject : GameObject, IDraggable
+    internal class BoxObject : GameObject, IDraggable, ITeleportable
     {
         private readonly float _size;
         private int _animFrame = 0;
 
         public float Size => _size;
 
+        // Конструктор остается прежним...
         public BoxObject(World world, SysVector spawnPos, float size)
         {
             _size = size;
-            PhysicsBody = BodyFactory.CreateRectangle(world, size, size, 2f, new XnaVector(spawnPos.X, spawnPos.Y));
+            CreatePhysics(world, spawnPos);
+            Layer = DrawLayer.DynamicObjects;
+        }
+
+        // Выносим создание тела в отдельный приватный метод для удобства переиспользования
+        private void CreatePhysics(World world, SysVector pos)
+        {
+            PhysicsBody = BodyFactory.CreateRectangle(world, _size, _size, 2f, new XnaVector(pos.X, pos.Y));
             PhysicsBody.BodyType = BodyType.Dynamic;
             PhysicsBody.Restitution = 0.2f;
             PhysicsBody.Friction = 0.6f;
+        }
 
-            // Указываем базовый слой для коробок
-            Layer = DrawLayer.DynamicObjects;
+        // Реализация метода телепортации
+        public void TeleportToWorld(World targetWorld, SysVector position, XnaVector velocity)
+        {
+            // 1. Если у объекта уже есть тело в каком-то мире — удаляем его
+            if (PhysicsBody != null)
+            {
+                PhysicsBody.RemoveFromWorld();
+                PhysicsBody = null;
+            }
+
+            // 2. Создаем точно такое же тело, но уже в новом targetWorld
+            CreatePhysics(targetWorld, position);
+
+            // 3. Возвращаем объекту скорость, которая у него была в момент переноса
+            if (PhysicsBody != null)
+            {
+                PhysicsBody.LinearVelocity = velocity;
+            }
         }
 
         // --- Реализация интерфейса IClickable ---

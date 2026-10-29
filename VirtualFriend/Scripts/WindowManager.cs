@@ -83,37 +83,82 @@ namespace VirtualFriend.Scripts
         {
             _ = Task.Run(async () =>
             {
-                const int DWMWA_CLOAKED = 14;
+                // Получаем дескриптор рабочего стола для фильтрации
+                IntPtr shellWindow = Win32Native.GetShellWindow();
+
                 while (_isRunning)
                 {
                     int zCounter = 0;
-
                     List<WindowData> currentWindows = new List<WindowData>();
+
                     Win32Native.EnumWindows((hWnd, lParam) =>
                     {
-                        if (!Win32Native.IsWindowVisible(hWnd)) return true;
+                        // 1. Базовая проверка видимости WinAPI и свернутости
+                        if (!Win32Native.IsWindowVisible(hWnd) || Win32Native.IsIconic(hWnd)) return true;
+
+                        // 2. Исключаем Shell-окно (рабочий стол)
+                        if (hWnd == shellWindow) return true;
+
+                        // 3. Получаем заголовок окна
                         StringBuilder sb = new StringBuilder(256);
                         Win32Native.GetWindowText(hWnd, sb, sb.Capacity);
                         if (string.IsNullOrWhiteSpace(sb.ToString())) return true;
 
-                        Win32Native.DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
+                        // 4. Тройная DWM-проверка (Проверка на Cloaked - замороженные/скрытые приложения Store)
+                        Win32Native.DwmGetWindowAttribute(hWnd, Win32Native.DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
                         if (isCloaked) return true;
 
+                        // Фильтр: Отрисовывает ли DWM физическую рамку оверлея приложения.
                         if (!Win32Native.GetExactWindowRect(hWnd, out Win32Native.RECT rect)) return true;
 
                         int width = rect.Right - rect.Left;
                         int height = rect.Bottom - rect.Top;
-                        if (width <= 16 || height <= 16 || rect.Left < -10000) return true;
 
+                        // Окна нулевого/минимального размера или сброшенные системой в виртуальные координаты
+                        if (width <= 16 || height <= 16 || rect.Left < -10000 || rect.Top < -10000) return true;
+
+                        // 5. Фильтрация по стилям (отсекаем отключенные системой окна)
+                        int style = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_STYLE);
+                        if ((style & Win32Native.WS_DISABLED) != 0) return true;
+
+                        // 6. Проверка WindowPlacement (showCmd == 0 означает SW_HIDE)
+                        Win32Native.WINDOWPLACEMENT placement = new Win32Native.WINDOWPLACEMENT();
+                        placement.length = Marshal.SizeOf(placement);
+                        if (Win32Native.GetWindowPlacement(hWnd, ref placement))
+                        {
+                            if (placement.showCmd == 0) return true;
+                        }
+
+                        // 7. Фильтрация по имени системного класса Windows
+                        StringBuilder sbClass = new StringBuilder(256);
+                        Win32Native.GetClassName(hWnd, sbClass, sbClass.Capacity);
+                        string className = sbClass.ToString();
+
+                        if (className == "Windows.UI.Core.CoreWindow" ||
+                            className == "Progman" ||
+                            className == "WorkerW") return true;
+
+                        // 8. Исключаем Tool-окна (панели инструментов)
+                        int exStyle = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_EXSTYLE);
+                        if ((exStyle & Win32Native.WS_EX_TOOLWINDOW) != 0) return true;
+
+                        // 9. Бронебойный фильтр для Realtek и ApplicationFrameWindow
+                        if (className == "ApplicationFrameWindow")
+                        {
+                            Win32Native.DwmGetWindowAttribute(hWnd, Win32Native.DWMWA_CLOAKED, out int cloakedVal, sizeof(int));
+                            if (cloakedVal != 0) return true;
+                        }
+
+                        // 10. Проверка на соответствие размерам рабочего стола или экрана
                         if (!((width == workAreaWidth && height == workAreaHeight) || (width == screenWidth && height == screenHeight)))
                         {
-                            if (!Win32Native.IsZoomed(hWnd) && !Win32Native.IsIconic(hWnd))
+                            if (!Win32Native.IsZoomed(hWnd))
                             {
                                 zCounter++;
 
                                 currentWindows.Add(new WindowData
                                 {
-                                    Hwnd = hWnd, // Сохраняем хэндл окна
+                                    Hwnd = hWnd,
                                     Width = width / _pixelsPerMeter,
                                     Height = height / _pixelsPerMeter,
                                     CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,

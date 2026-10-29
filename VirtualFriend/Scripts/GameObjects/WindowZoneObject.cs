@@ -1,10 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using Raylib_cs;
-using Genbox.VelcroPhysics.Dynamics;
+﻿using Genbox.VelcroPhysics.Dynamics;
 using Genbox.VelcroPhysics.Factories;
-using XnaVector = Microsoft.Xna.Framework.Vector2;
+using Raylib_cs;
+using System;
+using System.Collections.Generic;
+using VirtualFriend.Scripts.Interfaces;
 using SysVector = System.Numerics.Vector2;
+using XnaVector = Microsoft.Xna.Framework.Vector2;
 
 namespace VirtualFriend.Scripts.GameObjects
 {
@@ -109,9 +110,35 @@ namespace VirtualFriend.Scripts.GameObjects
             for (int i = 0; i < 5; i++)
             {
                 SysVector spawnPos = new SysVector(Center.X + (i * 0.2f) - 0.4f, Center.Y - 0.2f);
-                _microObjects.Add(GameObjectFactory.Instance.CreateBox(world, spawnPos, 0.5f));
+                BoxObject newObject = GameObjectFactory.Instance.CreateBox(world, spawnPos, 0.5f);
+                newObject.CurrentWindow = this;
+                _microObjects.Add(newObject);
             }
         }
+
+
+        public void TeleportIn(GameObject obj, SysVector worldPos, XnaVector velocity)
+        {
+            if (obj is ITeleportable teleportableObj)
+            {
+                // Переносим физическое тело объекта в локальный мир этого окна
+                teleportableObj.TeleportToWorld(_localWorld, worldPos, velocity);
+
+                // Прописываем «дом»
+                obj.CurrentWindow = this;
+
+                // Перемещаем объект во внутренний список окна
+                _microObjects.Add(obj);
+            }
+        }
+        public void TeleportOut(GameObject obj)
+        {
+            _microObjects.Remove(obj);
+            obj.CurrentWindow = null; // Объект больше не принадлежит этому окну
+        }
+
+
+
 
         public override void Update(float dt)
         {

@@ -17,9 +17,14 @@ namespace VirtualFriend.Scripts
         private const int VK_X = 0x58;
         private const int VK_LBUTTON = 0x01;
 
+        private bool _isLButtonDown = false;
+        private bool _isLButtonPressed = false;
+        private bool _isLButtonReleased = false;
+
+        private bool _wasLButtonDownLastFrame = false; // Для отслеживания изменений
         private bool _wasCPressed = false;
         private bool _wasXPressed = false;
-        private bool _wasLButtonPressed = false;
+
 
         private int _mouseX;
         private int _mouseY;

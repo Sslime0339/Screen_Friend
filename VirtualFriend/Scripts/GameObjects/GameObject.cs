@@ -10,6 +10,8 @@ namespace VirtualFriend.Scripts.GameObjects
         public Body PhysicsBody { get; protected set; }
         public bool IsDestroyed { get; protected set; }
 
+        public WindowZoneObject CurrentWindow { get; set; } = null;
+
         // Первое число: Глобальный слой
         public DrawLayer Layer { get; set; } = DrawLayer.DynamicObjects;
 
