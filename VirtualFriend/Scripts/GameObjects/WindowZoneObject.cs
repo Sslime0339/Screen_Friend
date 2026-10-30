@@ -16,6 +16,8 @@ namespace VirtualFriend.Scripts.GameObjects
         public float Height { get; private set; }
         public SysVector Center { get; private set; }
         public bool IsShow { get; private set; }
+        public bool WasMaximized { get; set; } = false;
+
 
 
         public IReadOnlyList<GameObject> MicroObjects => _microObjects;

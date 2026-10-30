@@ -130,6 +130,13 @@ namespace VirtualFriend
 
 
 
+
+            RenderTexture2D _canvas = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+
+
+
+
+
             while (_isRunning)
             {
 
@@ -167,6 +174,68 @@ namespace VirtualFriend
                 });
 
 
+
+
+
+
+                // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace
+                Raylib.BeginTextureMode(_canvas);
+                Raylib.ClearBackground(Color.Blank);
+
+
+                _renderEngine.BeginWorldSpace();
+                foreach (var obj in _desktopGameObjects)
+                {
+                    if (!(obj is WindowZoneObject))
+                    {
+                        obj.Draw(_renderEngine, _resourceManager);
+                    }
+                }
+                _renderEngine.EndWorldSpace();
+
+
+
+                // ШАГ 2: Вырезаем области окон, которые находятся ВЫШЕ текущего окна (ZIndex меньше)
+                Raylib.BeginBlendMode(BlendMode.Custom); // Включаем стирание контента
+
+                foreach (var win in _windowManager.GetActiveWindowObjects())
+                {
+                    if (!win.IsShow) continue;
+
+                    // Переводим метры обратно в пиксели экрана для корректного вырезания
+                    float screenW = win.Width * ppm;
+                    float screenH = win.Height * ppm;
+                    float screenX = (win.Center.X * ppm) - (screenW / 2f);
+                    float screenY = (win.Center.Y * ppm) - (screenH / 2f);
+
+                    // Вырезаем «дыру» на холсте
+                    Raylib.DrawRectangleRec(new Rectangle(screenX, screenY, screenW, screenH), Color.Blank);
+                    
+                }
+
+                Raylib.EndBlendMode();
+                Raylib.EndTextureMode();
+
+
+                Raylib.ClearBackground(Color.Blank);
+
+                // ШАГ 3: Выводим готовую замаскированную текстуру на экран
+                // Текстуры RenderTexture в Raylib инвертированы по вертикали, переворачиваем по Y (-canvas.Texture.Height)
+                Raylib.DrawTextureRec(
+                    _canvas.Texture,
+                    new Rectangle(0, 0, _canvas.Texture.Width, -_canvas.Texture.Height),
+                    SysVector.Zero,
+                    Color.White
+                );
+
+
+
+
+
+
+
+
+                /*
                 // Отрисовка сцены
                 _renderEngine.Begin(Color.Blank);
 
@@ -178,7 +247,7 @@ namespace VirtualFriend
                         obj.Draw(_renderEngine, _resourceManager);
                     }
                 }
-                _renderEngine.EndWorldSpace();
+                _renderEngine.EndWorldSpace();*/
 
                 var activeWindows = _windowManager.GetActiveWindowObjects();
                 foreach (var obj in _windowManager.GetActiveWindowObjects())

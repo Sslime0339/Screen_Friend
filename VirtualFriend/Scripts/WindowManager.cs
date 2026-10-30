@@ -75,6 +75,7 @@ namespace VirtualFriend.Scripts
 
                         if (data.IsMaximized)
                         {
+                            newWindowObj.WasMaximized = true; // Выставляем флаг
                             OnWindowMaximized?.Invoke(newWindowObj);
                         }
                     }
@@ -86,7 +87,8 @@ namespace VirtualFriend.Scripts
                         if (existingWindow.IsShow)
                         {
                             existingWindow.Hide();
-                            // --- ТРИГГЕР: Окно свернули ---
+                            // Сбрасываем флаг при сворачивании
+                            existingWindow.WasMaximized = false;
                             OnWindowMinimized?.Invoke(existingWindow);
                         }
                     }
@@ -99,13 +101,20 @@ namespace VirtualFriend.Scripts
 
                         existingWindow.UpdatePositionAndSize(data, dt);
 
-                        if (data.IsMaximized)
+                        // --- ИСПРАВЛЕННОЕ УСЛОВИЕ: Срабатывает только при изменении состояния ---
+                        if (data.IsMaximized && !existingWindow.WasMaximized)
                         {
-                            // --- ТРИГГЕР: Окно развернуто на весь экран ---
+                            existingWindow.WasMaximized = true; // Запоминаем, что окно уже обработано
                             OnWindowMaximized?.Invoke(existingWindow);
+                        }
+                        else if (!data.IsMaximized)
+                        {
+                            // Если окно сняли с полноэкранного режима, сбрасываем флаг
+                            existingWindow.WasMaximized = false;
                         }
                     }
                 }
+
             }
         }
 
