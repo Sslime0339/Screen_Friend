@@ -24,19 +24,21 @@ namespace VirtualFriend.Scripts.GameObjects
         }
 
         // Выносим создание тела в отдельный приватный метод для удобства переиспользования
-        private void CreatePhysics(World world, SysVector pos, float rotation = 0)
+        private void CreatePhysics(World world, SysVector pos, float rotation = 0, float angularVelocity = 0)
         {
             PhysicsBody = BodyFactory.CreateRectangle(world, _size, _size, 2f, new XnaVector(pos.X, pos.Y));
             PhysicsBody.BodyType = BodyType.Dynamic;
             PhysicsBody.Restitution = 0.2f;
             PhysicsBody.Friction = 0.6f;
             PhysicsBody.Rotation = rotation;
+            PhysicsBody.AngularVelocity = angularVelocity;
         }
 
         // Реализация метода телепортации
         public void TeleportToWorld(World targetWorld, SysVector position, XnaVector velocity)
         {
             float rotation = PhysicsBody.Rotation;
+            float angularVelocity = PhysicsBody.AngularVelocity;
             // 1. Если у объекта уже есть тело в каком-то мире — удаляем его
             if (PhysicsBody != null)
             {
@@ -44,7 +46,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 PhysicsBody = null;
             }
             // 2. Создаем точно такое же тело, но уже в новом targetWorld
-            CreatePhysics(targetWorld, position, rotation);
+            CreatePhysics(targetWorld, position, rotation, angularVelocity);
 
             // 3. Возвращаем объекту скорость, которая у него была в момент переноса
             if (PhysicsBody != null)
