@@ -61,12 +61,10 @@ namespace VirtualFriend.Scripts
         }
 
 
-
-        public static void MoveKinematicBody(Body body, Microsoft.Xna.Framework.Vector2 targetPosition, float dt)
+        public static void MoveKinematicBody(Body body, Microsoft.Xna.Framework.Vector2 targetPosition, float dt, float responsiveness = 15f)
         {
             if (body == null || dt <= 0f) return;
 
-            // Переводим тело в режим Kinematic, чтобы у него работала скорость и передача импульсов
             if (body.BodyType != BodyType.Kinematic)
             {
                 body.BodyType = BodyType.Kinematic;
@@ -75,9 +73,14 @@ namespace VirtualFriend.Scripts
             // Вычисляем вектор расстояния до цели
             Microsoft.Xna.Framework.Vector2 delta = targetPosition - body.Position;
 
-            // Формула скорости: Скорость = Расстояние / Время
-            // Это заставляет тело точно прийти в целевую точку к следующему шагу физики
-            body.LinearVelocity = delta / dt;
+            // Формула сбалансированного сглаживания, не зависящая от FPS:
+            // Показывает, какую часть расстояния тело должно преодолеть за этот кадр.
+            float factor = 1f - (float)Math.Exp(-responsiveness * dt);
+
+            // Скорость = Расстояние_на_этот_кадр / Время_кадра
+            body.LinearVelocity = (delta * factor) / dt;
         }
+
+
     }
 }

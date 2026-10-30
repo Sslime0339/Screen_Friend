@@ -102,16 +102,21 @@ namespace VirtualFriend.Scripts.GameObjects
             {
                 float thickness = 50f;
 
+                // Сила стремления стен к целевой позиции окна (настройте под себя)
+                // 20f — хорошая базовая жесткость, чтобы стены не отставали слишком сильно
+                float wallForce = 20f;
+
                 XnaVector targetFloor = new XnaVector(Center.X, Center.Y + Height / 2f + thickness / 2);
                 XnaVector targetCeiling = new XnaVector(Center.X, Center.Y - Height / 2f - thickness / 2);
                 XnaVector targetLeft = new XnaVector(Center.X - Width / 2f - thickness / 2, Center.Y);
                 XnaVector targetRight = new XnaVector(Center.X + Width / 2f + thickness / 2, Center.Y);
 
-                PhysicsSystem.MoveKinematicBody(_innerWalls[0], targetFloor, dt);
-                PhysicsSystem.MoveKinematicBody(_innerWalls[1], targetCeiling, dt);
-                PhysicsSystem.MoveKinematicBody(_innerWalls[2], targetLeft, dt);
-                PhysicsSystem.MoveKinematicBody(_innerWalls[3], targetRight, dt);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[0], targetFloor, dt, wallForce);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[1], targetCeiling, dt, wallForce);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[2], targetLeft, dt, wallForce);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[3], targetRight, dt, wallForce);
             }
+
         }
 
         private void BuildInnerBoundaries(World world)
