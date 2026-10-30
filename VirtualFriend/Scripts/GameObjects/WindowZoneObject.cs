@@ -17,6 +17,12 @@ namespace VirtualFriend.Scripts.GameObjects
         public SysVector Center { get; private set; }
         public bool IsShow { get; private set; }
 
+
+        public IReadOnlyList<GameObject> MicroObjects => _microObjects;
+
+
+
+
         private readonly List<GameObject> _microObjects = new List<GameObject>();
         private readonly List<Body> _innerWalls = new List<Body>();
         private readonly World _localWorld;

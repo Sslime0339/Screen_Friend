@@ -113,6 +113,10 @@ namespace VirtualFriend
 
 
             _windowManager = new WindowManager(_physicsSystem.World, ppm);
+
+            _windowManager.OnWindowMinimized += Global_OnWindowMinimized;
+            _windowManager.OnWindowMaximized += Global_OnWindowMaximized;
+
             _windowManager.StartScanning(workAreaWidth, workAreaHeight, screenWidth, screenHeight, ReylibHWnd);
 
 
@@ -424,6 +428,52 @@ namespace VirtualFriend
 
             // Окон под курсором нет
             return null;
+        }
+
+        private static void Global_OnWindowMinimized(WindowZoneObject minimizedWindow)
+        {
+            Console.WriteLine($"Окно {minimizedWindow.Hwnd} свернуто. Выталкиваем объекты наружу...");
+
+            // Создаем копию списка, так как HandleObjectTeleportation будет модифицировать оригинальный коллекцию внутри окна
+            var objectsToMove = new List<GameObject>(minimizedWindow.MicroObjects);
+
+            foreach (var obj in objectsToMove)
+            {
+                if (obj.PhysicsBody == null) continue;
+
+                // Получаем текущие параметры объекта в метрах физического мира
+                SysVector currentPos = new SysVector(obj.PhysicsBody.Position.X, obj.PhysicsBody.Position.Y);
+                XnaVector currentVelocity = obj.PhysicsBody.LinearVelocity;
+
+                // Временно отвязываем от текущего свернутого окна, чтобы HandleObjectTeleportation посчитал его свободным
+                //minimizedWindow.TeleportOut(obj);
+
+                // Функция сама определит: отправить объект в окно уровнем ниже (если оно под ним) или на рабочий стол
+                HandleObjectTeleportation(obj, currentPos, currentVelocity);
+            }
+        }
+
+        private static void Global_OnWindowMaximized(WindowZoneObject maximizedWindow)
+        {
+            Console.WriteLine($"Окно {maximizedWindow.Hwnd} развернуто на весь экран! Собираем объекты рабочего стола...");
+
+            // Создаем копию списка объектов рабочего стола, так как будем удалять элементы из него во время итерации
+            var desktopObjectsCopy = new List<GameObject>(_desktopGameObjects);
+
+            foreach (var obj in desktopObjectsCopy)
+            {
+                // WindowZoneObject тоже лежит в общем списке, его не трогаем, переносим только ящики/персонажей
+                if (obj is WindowZoneObject || obj.PhysicsBody == null) continue;
+
+                SysVector currentPos = new SysVector(obj.PhysicsBody.Position.X, obj.PhysicsBody.Position.Y);
+                XnaVector currentVelocity = obj.PhysicsBody.LinearVelocity;
+
+                // Удаляем с рабочего стола
+                _desktopGameObjects.Remove(obj);
+
+                // Телепортируем внутрь распахнутого окна
+                maximizedWindow.TeleportIn(obj, currentPos, currentVelocity);
+            }
         }
 
 
