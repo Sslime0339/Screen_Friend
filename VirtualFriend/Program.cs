@@ -143,8 +143,10 @@ namespace VirtualFriend
 
                 float dt = Raylib.GetFrameTime();
 
+
+                WindowZoneObject WinUnderMouse = GetTopWindowUnderMouse(_inputManager.GetMouseWorldPosition());
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
-                _inputManager.Update(_allGameObjects, dt);
+                _inputManager.Update(_allGameObjects, dt, WinUnderMouse);
 
                 // --- Логика управления ящиками и объектами ---
                 HandleInput();
@@ -265,6 +267,7 @@ namespace VirtualFriend
                 if (Raylib.WindowShouldClose() || _inputManager.IsExitPressed()) _isRunning = false;
             }
 
+            _windowManager.Stop();
             _resourceManager.UnloadAll();
             Raylib.CloseWindow();
 
@@ -320,13 +323,14 @@ namespace VirtualFriend
             // 1. СОБЫТИЕ: Клик только что произошел (Нажатие кнопки)
             if (_inputManager.IsLButtonPressed() && _draggedObject == null)
             {
+                WindowZoneObject WinUnderMouse = GetTopWindowUnderMouse(currentMouseWorld);
                 foreach (var obj in _allGameObjects)
                 {
                     // Проверяем, поддерживает ли объект перетаскивание
                     if (obj is IDraggable draggable)
                     {
                         // Проверяем попадание мыши методами интерфейса IClickable
-                        if (draggable.IsUnderMouse(currentMouseWorld))
+                        if (draggable.IsUnderMouse(currentMouseWorld, WinUnderMouse))
                         {
                             _draggedObject = draggable;
 
@@ -396,7 +400,7 @@ namespace VirtualFriend
 
                         // Переносим объект в новое окно
                         topWindow.TeleportIn(obj, currentMouseWorld, releaseVelocity);
-                        Console.WriteLine("Объект телепортирован в окно");
+                        //Console.WriteLine("Объект телепортирован в окно");
                     }
                 }
                 // Если окон под мышкой нет, но объект сейчас находится внутри окна — выносим его на рабочий стол
@@ -411,7 +415,7 @@ namespace VirtualFriend
                         _desktopGameObjects.Add(gameObj);
                     }
 
-                    Console.WriteLine("Объект телепортирован на рабочий стол");
+                    //Console.WriteLine("Объект телепортирован на рабочий стол");
                 }
             }
         }

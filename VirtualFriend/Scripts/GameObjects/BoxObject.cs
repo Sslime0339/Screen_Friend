@@ -57,8 +57,9 @@ namespace VirtualFriend.Scripts.GameObjects
 
         // --- Реализация интерфейса IClickable ---
 
-        public bool IsUnderMouse(SysVector mouseWorldPos)
+        public bool IsUnderMouse(SysVector mouseWorldPos, WindowZoneObject WinUnderMouse)
         {
+
             if (CurrentWindow != null)
             {
                 if (!CurrentWindow.IsShow) return false;
@@ -68,6 +69,14 @@ namespace VirtualFriend.Scripts.GameObjects
 
             float halfSize = _size / 2f;
             var pos = PhysicsBody.Position;
+
+
+            if (WinUnderMouse != null && CurrentWindow != null)
+            {
+                if (CurrentWindow.ZIndex > WinUnderMouse.ZIndex) return false;
+            }
+            else if (WinUnderMouse != null &&  CurrentWindow == null) return false;
+
 
             return mouseWorldPos.X >= pos.X - halfSize && mouseWorldPos.X <= pos.X + halfSize &&
                    mouseWorldPos.Y >= pos.Y - halfSize && mouseWorldPos.Y <= pos.Y + halfSize;

@@ -44,7 +44,7 @@ namespace VirtualFriend.Scripts
             ResetMousePosition();
         }
 
-        public void Update(List<GameObjects.GameObject> gameObjects, float dt)
+        public void Update(List<GameObjects.GameObject> gameObjects, float dt, WindowZoneObject WinUnderMouse)
         {
             // Сохраняем предыдущую позицию в метрах перед обновлением
             SysVector previousMouseWorld = GetMouseWorldPosition();
@@ -76,7 +76,7 @@ namespace VirtualFriend.Scripts
                 if (obj is IClickable clickable)
                 {
                     // Сам объект решает, попала ли в него мышь
-                    if (clickable.IsUnderMouse(currentMouseWorld))
+                    if (clickable.IsUnderMouse(currentMouseWorld, WinUnderMouse))
                     {
                         isHoveringObject = true;
                         break;
