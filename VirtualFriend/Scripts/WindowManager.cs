@@ -48,7 +48,7 @@ namespace VirtualFriend.Scripts
         }
 
         // Обновление состояния: создание, актуализация и удаление игровых объектов окон
-        public void Update(float ppm)
+        public void Update(float ppm, float dt)
         {
             List<WindowData> snapshot = GetWindowsSnapshot();
 
@@ -104,7 +104,7 @@ namespace VirtualFriend.Scripts
 
                             // Если окно активно — обновляем его параметры в игровом движке
                         }
-                        existingWindow.UpdatePositionAndSize(data);
+                        existingWindow.UpdatePositionAndSize(data, dt);
                     }
                 }
             }

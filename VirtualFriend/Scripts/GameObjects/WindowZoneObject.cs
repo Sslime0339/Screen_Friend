@@ -80,12 +80,12 @@ namespace VirtualFriend.Scripts.GameObjects
             _isCanvasInitialized = true;
         }
 
-        public void UpdatePositionAndSize(WindowManager.WindowData data)
+        public void UpdatePositionAndSize(WindowManager.WindowData data, float dt) // <-- ДОБАВЛЕН dt ПАРАМЕТР
         {
-            ZIndex = data.ZIndex; // Обновляем Z-Index при изменении состояния окон
+            ZIndex = data.ZIndex;
 
-            if (Width == data.Width && Height == data.Height && Center == new SysVector(data.CenterX, data.CenterY))
-                return;
+            // ВАЖНО: Больше не делаем return при совпадении координат, 
+            // так как кинематические тела должны поддерживать скорость (или занулять её), пока окно статично.
 
             Width = data.Width;
             Height = data.Height;
@@ -96,27 +96,43 @@ namespace VirtualFriend.Scripts.GameObjects
                 PhysicsBody.Position = new XnaVector(Center.X, Center.Y);
             }
 
-            ClearInnerBoundaries(_localWorld);
-            BuildInnerBoundaries(_localWorld);
+            // Вместо удаления (ClearInnerBoundaries) и пересоздания стен, 
+            // мы вычисляем их новые целевые позиции и двигаем через физику!
+            if (_innerWalls.Count == 4)
+            {
+                float thickness = 50f;
+
+                XnaVector targetFloor = new XnaVector(Center.X, Center.Y + Height / 2f + thickness / 2);
+                XnaVector targetCeiling = new XnaVector(Center.X, Center.Y - Height / 2f - thickness / 2);
+                XnaVector targetLeft = new XnaVector(Center.X - Width / 2f - thickness / 2, Center.Y);
+                XnaVector targetRight = new XnaVector(Center.X + Width / 2f + thickness / 2, Center.Y);
+
+                PhysicsSystem.MoveKinematicBody(_innerWalls[0], targetFloor, dt);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[1], targetCeiling, dt);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[2], targetLeft, dt);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[3], targetRight, dt);
+            }
         }
 
         private void BuildInnerBoundaries(World world)
         {
             float thickness = 50f;
+
+            // Каждая из стен теперь создается изначально, но мы настраиваем тип на Kinematic
             var floor = BodyFactory.CreateRectangle(world, Width * 2, thickness, 1f, new XnaVector(Center.X, Center.Y + Height / 2f + thickness / 2));
-            floor.BodyType = BodyType.Static;
+            floor.BodyType = BodyType.Kinematic;
             _innerWalls.Add(floor);
 
             var ceiling = BodyFactory.CreateRectangle(world, Width * 2, thickness, 1f, new XnaVector(Center.X, Center.Y - Height / 2f - thickness / 2));
-            ceiling.BodyType = BodyType.Static;
+            ceiling.BodyType = BodyType.Kinematic;
             _innerWalls.Add(ceiling);
 
             var leftWall = BodyFactory.CreateRectangle(world, thickness, Height * 2, 1f, new XnaVector(Center.X - Width / 2f - thickness / 2, Center.Y));
-            leftWall.BodyType = BodyType.Static;
+            leftWall.BodyType = BodyType.Kinematic;
             _innerWalls.Add(leftWall);
 
             var rightWall = BodyFactory.CreateRectangle(world, thickness, Height * 2, 1f, new XnaVector(Center.X + Width / 2f + thickness / 2, Center.Y));
-            rightWall.BodyType = BodyType.Static;
+            rightWall.BodyType = BodyType.Kinematic;
             _innerWalls.Add(rightWall);
         }
 
@@ -259,8 +275,64 @@ namespace VirtualFriend.Scripts.GameObjects
             Raylib.DrawRectangleLinesEx(rect, 1f, Color.Blue);
 
             renderer.DrawTextWithShadow($"{this.Hwnd}", new SysVector((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm), 24, Color.White);
+
+            DrawWalls();
 #endif
         }
+
+
+#if DEBUG
+
+        public void DrawWalls()
+        {
+            foreach (var wall in _innerWalls)
+            {
+                if (wall.FixtureList == null || wall.FixtureList.Count == 0)
+                    continue;
+
+                // В VelcroPhysics прямоугольники, созданные через BodyFactory.CreateRectangle, являются PolygonShape
+                if (wall.FixtureList[0].Shape is Genbox.VelcroPhysics.Collision.Shapes.PolygonShape polygonShape)
+                {
+                    // Получаем локальные вершины полигона
+                    var vertices = polygonShape.Vertices;
+                    if (vertices.Count < 4) continue;
+
+                    // Находим минимальные и максимальные локальные координаты, чтобы вычислить размеры
+                    float minX = float.MaxValue, maxX = float.MinValue;
+                    float minY = float.MaxValue, maxY = float.MinValue;
+
+                    foreach (var vertex in vertices)
+                    {
+                        if (vertex.X < minX) minX = vertex.X;
+                        if (vertex.X > maxX) maxX = vertex.X;
+                        if (vertex.Y < minY) minY = vertex.Y;
+                        if (vertex.Y > maxY) maxY = vertex.Y;
+                    }
+
+                    float width = maxX - minX;
+                    float height = maxY - minY;
+
+                    // Переводим позицию тела из метров в пиксели экрана
+                    float posX = wall.Position.X * _ppm;
+                    float posY = wall.Position.Y * _ppm;
+
+                    // Вычисляем размеры прямоугольника в пикселях
+                    float screenW = width * _ppm;
+                    float screenH = height * _ppm;
+
+                    // Вычисляем верхний левый угол для отрисовки в Raylib (смещение от центра тела)
+                    float screenX = posX - (width / 2f * _ppm);
+                    float screenY = posY - (height / 2f * _ppm);
+
+                    // Рисуем полупрозрачную рамку вокруг стены для отладки
+                    var rect = new Rectangle(screenX, screenY, screenW, screenH);
+                    Raylib.DrawRectangleLinesEx(rect, 2f, Color.Red);
+                    Raylib.DrawRectangleRec(rect, new Color(255, 0, 0, 40)); // Легкая красная заливка
+                }
+            }
+        }
+        
+#endif
 
 
         public override void Draw(RenderEngine renderer, ResourceManager resourceManager)

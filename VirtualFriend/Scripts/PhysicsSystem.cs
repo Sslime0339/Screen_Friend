@@ -59,5 +59,25 @@ namespace VirtualFriend.Scripts
         {
             World.Step(Math.Min(dt, 1f / 60f));
         }
+
+
+
+        public static void MoveKinematicBody(Body body, Microsoft.Xna.Framework.Vector2 targetPosition, float dt)
+        {
+            if (body == null || dt <= 0f) return;
+
+            // Переводим тело в режим Kinematic, чтобы у него работала скорость и передача импульсов
+            if (body.BodyType != BodyType.Kinematic)
+            {
+                body.BodyType = BodyType.Kinematic;
+            }
+
+            // Вычисляем вектор расстояния до цели
+            Microsoft.Xna.Framework.Vector2 delta = targetPosition - body.Position;
+
+            // Формула скорости: Скорость = Расстояние / Время
+            // Это заставляет тело точно прийти в целевую точку к следующему шагу физики
+            body.LinearVelocity = delta / dt;
+        }
     }
 }

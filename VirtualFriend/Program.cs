@@ -20,11 +20,11 @@ using XnaVector = Microsoft.Xna.Framework.Vector2;
 
 
 
+// TODO: Сделать перемещение окон через скорость а не телепортацию по позиции, и вынести эту функцию
 
 
 // TODO: вынести сортировку и отрисовку в отдельную функцию
 // TODO: Сделать чтобы если ящик перекрывает окно то за ящик нельзя схватиться
-// TODO: Сделать перемещение окон через скорость а не телепортацию по позиции, и вынести эту функцию
 
 
 // TODO: Сделать обрезку объектов которые находятся на рабочем столе
@@ -145,7 +145,7 @@ namespace VirtualFriend
                     if (_allGameObjects[i].IsDestroyed) _allGameObjects.RemoveAt(i);
                 }
 
-                _windowManager.Update(ppm);
+                _windowManager.Update(ppm, dt);
 
                 // Шаг физического мира
                 _physicsSystem.Step(dt);
@@ -284,7 +284,9 @@ namespace VirtualFriend
             // 3. СОБЫТИЕ: Удержание кнопки мыши (Перетаскивание)
             else if (_inputManager.IsLButtonDown() && _draggedObject != null)
             {
-                float responsiveness = 12f;
+                float mouseWorldVelocityLength = _inputManager.MouseWorldVelocity.Length();
+
+                float responsiveness = 1f * (mouseWorldVelocityLength * mouseWorldVelocityLength * 0.01f + 10);
 
                 // Передаем объекту задачу следовать за курсором
                 _draggedObject.OnDrag(currentMouseWorldXna, responsiveness);
