@@ -27,6 +27,10 @@ namespace VirtualFriend.Scripts.GameObjects
         private bool _isCanvasInitialized = false;
         private readonly float _ppm;
 
+
+
+        private const float WallThickness = 50;
+
         public WindowZoneObject(World world, WindowManager.WindowData data, float ppm)
         {
             Hwnd = data.Hwnd;
@@ -57,7 +61,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 return;
             }
             PhysicsBody = BodyFactory.CreateRectangle(world, Width, Height, 1f, new XnaVector(Center.X, Center.Y));
-            PhysicsBody.BodyType = BodyType.Static;
+            PhysicsBody.BodyType = BodyType.Kinematic;
         }
 
         private void DeleteOuterBody()
@@ -91,52 +95,51 @@ namespace VirtualFriend.Scripts.GameObjects
             Height = data.Height;
             Center = new SysVector(data.CenterX, data.CenterY);
 
+            // Сила стремления стен к целевой позиции окна (настройте под себя)
+            // 20f — хорошая базовая жесткость, чтобы стены не отставали слишком сильно
+            float force = 20f;
+
+
             if (PhysicsBody != null)
             {
-                PhysicsBody.Position = new XnaVector(Center.X, Center.Y);
+                PhysicsSystem.MoveKinematicBody(PhysicsBody, new XnaVector(Center.X, Center.Y), dt, force);
+                //cPhysicsBody.Position = new XnaVector(Center.X, Center.Y);
             }
 
             // Вместо удаления (ClearInnerBoundaries) и пересоздания стен, 
             // мы вычисляем их новые целевые позиции и двигаем через физику!
             if (_innerWalls.Count == 4)
             {
-                float thickness = 50f;
+                XnaVector targetFloor = new XnaVector(Center.X, Center.Y + Height / 2f + WallThickness / 2);
+                XnaVector targetCeiling = new XnaVector(Center.X, Center.Y - Height / 2f - WallThickness / 2);
+                XnaVector targetLeft = new XnaVector(Center.X - Width / 2f - WallThickness / 2, Center.Y);
+                XnaVector targetRight = new XnaVector(Center.X + Width / 2f + WallThickness / 2, Center.Y);
 
-                // Сила стремления стен к целевой позиции окна (настройте под себя)
-                // 20f — хорошая базовая жесткость, чтобы стены не отставали слишком сильно
-                float wallForce = 20f;
-
-                XnaVector targetFloor = new XnaVector(Center.X, Center.Y + Height / 2f + thickness / 2);
-                XnaVector targetCeiling = new XnaVector(Center.X, Center.Y - Height / 2f - thickness / 2);
-                XnaVector targetLeft = new XnaVector(Center.X - Width / 2f - thickness / 2, Center.Y);
-                XnaVector targetRight = new XnaVector(Center.X + Width / 2f + thickness / 2, Center.Y);
-
-                PhysicsSystem.MoveKinematicBody(_innerWalls[0], targetFloor, dt, wallForce);
-                PhysicsSystem.MoveKinematicBody(_innerWalls[1], targetCeiling, dt, wallForce);
-                PhysicsSystem.MoveKinematicBody(_innerWalls[2], targetLeft, dt, wallForce);
-                PhysicsSystem.MoveKinematicBody(_innerWalls[3], targetRight, dt, wallForce);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[0], targetFloor, dt, force);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[1], targetCeiling, dt, force);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[2], targetLeft, dt, force);
+                PhysicsSystem.MoveKinematicBody(_innerWalls[3], targetRight, dt, force);
             }
 
         }
 
         private void BuildInnerBoundaries(World world)
         {
-            float thickness = 50f;
 
             // Каждая из стен теперь создается изначально, но мы настраиваем тип на Kinematic
-            var floor = BodyFactory.CreateRectangle(world, Width * 2, thickness, 1f, new XnaVector(Center.X, Center.Y + Height / 2f + thickness / 2));
+            var floor = BodyFactory.CreateRectangle(world, Width * 2, WallThickness, 1f, new XnaVector(Center.X, Center.Y + Height / 2f + WallThickness / 2));
             floor.BodyType = BodyType.Kinematic;
             _innerWalls.Add(floor);
 
-            var ceiling = BodyFactory.CreateRectangle(world, Width * 2, thickness, 1f, new XnaVector(Center.X, Center.Y - Height / 2f - thickness / 2));
+            var ceiling = BodyFactory.CreateRectangle(world, Width * 2, WallThickness, 1f, new XnaVector(Center.X, Center.Y - Height / 2f - WallThickness / 2));
             ceiling.BodyType = BodyType.Kinematic;
             _innerWalls.Add(ceiling);
 
-            var leftWall = BodyFactory.CreateRectangle(world, thickness, Height * 2, 1f, new XnaVector(Center.X - Width / 2f - thickness / 2, Center.Y));
+            var leftWall = BodyFactory.CreateRectangle(world, WallThickness, Height * 2, 1f, new XnaVector(Center.X - Width / 2f - WallThickness / 2, Center.Y));
             leftWall.BodyType = BodyType.Kinematic;
             _innerWalls.Add(leftWall);
 
-            var rightWall = BodyFactory.CreateRectangle(world, thickness, Height * 2, 1f, new XnaVector(Center.X + Width / 2f + thickness / 2, Center.Y));
+            var rightWall = BodyFactory.CreateRectangle(world, WallThickness, Height * 2, 1f, new XnaVector(Center.X + Width / 2f + WallThickness / 2, Center.Y));
             rightWall.BodyType = BodyType.Kinematic;
             _innerWalls.Add(rightWall);
         }
@@ -202,22 +205,44 @@ namespace VirtualFriend.Scripts.GameObjects
         {
             if (!_isCanvasInitialized || IsDestroyed || !IsShow) return;
 
-            // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace (камера оверлея)
+            // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace
             Raylib.BeginTextureMode(_canvas);
-            Raylib.ClearBackground(Color.Blank); // Полностью прозрачный холст
+            Raylib.ClearBackground(Color.Blank);
 
-            // --- ДОБАВЛЕНО: ОБРЕЗКА ПО ГРАНИЦАМ ТЕКУЩЕГО ОКНА ---
-            // Вычисляем экранные координаты текущего окна для Scissor Test
-            float thisScreenW = Width * _ppm;
-            float thisScreenH = Height * _ppm;
-            float thisScreenX = (Center.X * _ppm) - (thisScreenW / 2f);
-            // Так как мы рисуем НА RenderTexture, физический верх и низ инвертированы относительно экрана.
-            // Но Raylib-cs автоматически учитывает это при Scissor Mode внутри TextureMode. 
-            // Если возникнет сдвиг по вертикали, может потребоваться инвертировать Y: (Raylib.GetScreenHeight() - ...)
-            float thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
+            // --- ОБНОВЛЕНО: ОБРЕЗКА ПО РЕАЛЬНЫМ КООРДИНАТАМ СТЕН ---
+            float thisScreenX, thisScreenY, thisScreenW, thisScreenH;
 
-            // Активируем обрезку (все, что за пределами этого прямоугольника, не запишется в текстуру)
+            if (_innerWalls.Count == 4)
+            {
+                // Берем координаты из физических тел (учитывая толщину стен thickness = 50f)
+                // В BuildInnerBoundaries: 
+                // левая стена центрирована по X = Center.X - Width/2 - thickness/2
+                // верхняя стена центрирована по Y = Center.Y - Height/2 - thickness/2
+                float thickness = 50f;
+
+                float physicsLeftEdge = _innerWalls[2].Position.X + (thickness / 2f);
+                float physicsTopEdge = _innerWalls[1].Position.Y + (thickness / 2f);
+                float physicsRightEdge = _innerWalls[3].Position.X - (thickness / 2f);
+                float physicsBottomEdge = _innerWalls[0].Position.Y - (thickness / 2f);
+
+                // Переводим в экранные пиксели
+                thisScreenX = physicsLeftEdge * _ppm;
+                thisScreenY = physicsTopEdge * _ppm;
+                thisScreenW = (physicsRightEdge - physicsLeftEdge) * _ppm;
+                thisScreenH = (physicsBottomEdge - physicsTopEdge) * _ppm;
+            }
+            else
+            {
+                // Запасной вариант, если стены еще не создались
+                thisScreenW = Width * _ppm;
+                thisScreenH = Height * _ppm;
+                thisScreenX = (Center.X * _ppm) - (thisScreenW / 2f);
+                thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
+            }
+
+            // Активируем обрезку по реальным физическим границам
             Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
+
 
             // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
             _microObjects.Sort((a, b) =>
