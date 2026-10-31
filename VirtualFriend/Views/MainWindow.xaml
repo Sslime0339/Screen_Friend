@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="Виртуальный Друг — Меню" Height="380" Width="360"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        ResizeMode="CanMinimize">
 
     <!-- Стили для красивых современных кнопок -->
     <Window.Resources>

@@ -77,7 +77,8 @@ namespace VirtualFriend
                 ConfigFlags.UndecoratedWindow |
                 ConfigFlags.TransparentWindow |
                 ConfigFlags.TopmostWindow |
-                ConfigFlags.AlwaysRunWindow
+                ConfigFlags.AlwaysRunWindow |
+                ConfigFlags.HiddenWindow
             );
 
 
@@ -96,6 +97,29 @@ namespace VirtualFriend
             {
                 ReylibHWnd = (IntPtr)Raylib.GetWindowHandle();
             }
+
+
+
+            // === СКРЫТИЕ ОКНА RAYLIB ИЗ ПАНЕЛИ ЗАДАЧ И ALT+TAB ===
+            if (ReylibHWnd != IntPtr.Zero)
+            {
+                // 1. Временно скрываем окно из видимости ОС (иначе стили панели задач не обновятся)
+                ShowWindow(ReylibHWnd, SW_HIDE);
+
+                // 2. Получаем текущие расширенные стили окна
+                int exStyle = GetWindowLong(ReylibHWnd, GWL_EXSTYLE);
+
+                // 3. Убираем флаг стандартного приложения и принудительно выставляем стиль ToolWindow (инструментальное окно)
+                exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+                SetWindowLong(ReylibHWnd, GWL_EXSTYLE, exStyle);
+
+                // 4. Возвращаем окну видимость
+                ShowWindow(ReylibHWnd, SW_SHOW);
+            }
+            // =====================================================
+
+
+
 
 
 
@@ -269,8 +293,6 @@ namespace VirtualFriend
 
                 _renderEngine.End();
 
-
-                if (Raylib.WindowShouldClose() || _inputManager.IsExitPressed()) _isRunning = false;
             }
 
             _windowManager.Stop();
@@ -302,6 +324,15 @@ namespace VirtualFriend
 
         private static void HandleInput(float dt)
         {
+
+
+            if (Raylib.WindowShouldClose() || _inputManager.IsExitPressed())
+            { 
+                if (!_isMenuWindowOpen) _isRunning = false;
+            }
+            
+
+
             // --- 1. Создание ящика (Клавиша C) ---
             if (_inputManager.IsSpawnPressed())
             {

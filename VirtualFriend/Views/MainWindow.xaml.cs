@@ -17,25 +17,54 @@ namespace VirtualFriend.Views
     /// </summary>
     public partial class MainWindow : Window
     {
+        // Храним ссылки на открытые окна, чтобы не плодить дубликаты
+        private SettingsWindow? _activeSettingsWindow = null;
+        private InfoWindow? _activeInfoWindow = null;
+
+
         public MainWindow()
         {
             InitializeComponent();
         }
 
-        // Кнопка открывает созданное ранее окно InfoWindow напрямую из главного меню
+        // Кнопка "Инструкция"
         private void InfoButton_Click(object sender, RoutedEventArgs e)
         {
-            InfoWindow infoWindow = new InfoWindow();
-            infoWindow.Owner = this; // Привязываем к главному меню
-            infoWindow.ShowDialog();
+            // Если окно уже создано и отображается
+            if (_activeInfoWindow != null && _activeInfoWindow.IsLoaded)
+            {
+                _activeInfoWindow.Activate(); // Выводим на передний план
+                return;
+            }
+
+            _activeInfoWindow = new InfoWindow();
+            _activeInfoWindow.Owner = this;
+
+            // Очищаем ссылку, когда пользователь закроет окно крестиком
+            _activeInfoWindow.Closed += (s, args) => { _activeInfoWindow = null; };
+
+            _activeInfoWindow.Show();
         }
 
+        // Кнопка "Настройки"
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            SettingsWindow settings = new SettingsWindow();
-            settings.Owner = this;
-            settings.ShowDialog();
+            // Если окно настроек уже создано и отображается
+            if (_activeSettingsWindow != null && _activeSettingsWindow.IsLoaded)
+            {
+                _activeSettingsWindow.Activate(); // Выводим на передний план
+                return;
+            }
+
+            _activeSettingsWindow = new SettingsWindow();
+            _activeSettingsWindow.Owner = this;
+
+            // Очищаем ссылку, когда пользователь закроет окно крестиком
+            _activeSettingsWindow.Closed += (s, args) => { _activeSettingsWindow = null; };
+
+            _activeSettingsWindow.Show();
         }
+
 
         private void ExitButton_Click(object sender, RoutedEventArgs e)
         {
