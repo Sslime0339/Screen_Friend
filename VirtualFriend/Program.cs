@@ -63,7 +63,8 @@ namespace VirtualFriend
 
         private static readonly List<GameObject> _desktopGameObjects = new List<GameObject>();
         private static bool _isRunning = true;
-        private static bool _isMenuWindowOpen = false;
+        private static bool _isMenuWindowOpen = false; 
+        private static System.Windows.Application? _wpfApp = null;
 
         // ИСПОЛЬЗУЕМ ИНТЕРФЕЙС: Храним ссылку на любой таскаемый объект
         private static IDraggable _draggedObject = null;
@@ -276,6 +277,9 @@ namespace VirtualFriend
             _resourceManager.UnloadAll();
             Raylib.CloseWindow();
 
+
+            System.Environment.Exit(0);
+
         }
 
 
@@ -319,6 +323,13 @@ namespace VirtualFriend
                     }
                 }
                 _draggedObject = null; // Сбрасываем захват при очистке
+            }
+
+
+            // --- Открывание главного меню ---
+            if (_inputManager.IsMenuPressed())
+            {
+                OpenMainMenu();
             }
 
             // --- 3. ХВАТАНИЕ И ПЕРЕТАСКИВАНИЕ (Через интерфейсы) ---
@@ -563,23 +574,41 @@ namespace VirtualFriend
 
             _isMenuWindowOpen = true;
 
+            // Создаем и запускаем поток WPF в режиме STA
             Thread wpfThread = new Thread(() =>
             {
-                if (System.Windows.Application.Current == null)
+                try
                 {
-                    new System.Windows.Application();
+                    // Инициализируем глобальное WPF приложение строго ОДИН РАЗ за всю жизнь процесса
+                    if (_wpfApp == null)
+                    {
+                        _wpfApp = new System.Windows.Application();
+
+                        // ВАЖНО: Запрещаем WPF автоматически завершать работу приложения при закрытии окон.
+                        // Это сохранит контекст живым для последующих открытий меню!
+                        _wpfApp.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+                    }
+
+                    // Создаем экземпляр главного меню
+                    MainWindow mainMenu = new MainWindow();
+
+                    // Когда окно закрывается пользователем, просто сбрасываем флаг контроля
+                    mainMenu.Closed += (s, e) =>
+                    {
+                        _isMenuWindowOpen = false;
+                    };
+
+                    // Открываем окно
+                    mainMenu.ShowDialog();
                 }
-
-                // Создаем и показываем ГЛАВНОЕ МЕНЮ
-                MainWindow mainMenu = new MainWindow();
-
-                // Когда главное меню закрывается, сбрасываем флаг, чтобы его можно было открыть снова
-                mainMenu.Closed += (s, e) => { _isMenuWindowOpen = false; };
-
-                mainMenu.ShowDialog();
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Ошибка при открытии меню: {ex.Message}");
+                    _isMenuWindowOpen = false;
+                }
             });
 
-            wpfThread.SetApartmentState(ApartmentState.STA);
+            wpfThread.SetApartmentState(ApartmentState.STA); // Обязательно для WPF
             wpfThread.Start();
         }
 

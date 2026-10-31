@@ -5,39 +5,93 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VirtualFriend.Views"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    
-    <Grid Margin="30">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Stretch">
-            <!-- Заголовок меню -->
-            <TextBlock Text="РИХЭЫШЪЕ" 
-                   FontSize="28" 
-                   FontWeight="Bold" 
-                   Foreground="White" 
-                   HorizontalAlignment="Center" 
-                   Margin="0,0,0,40"/>
+        Title="Виртуальный Друг — Меню" Height="380" Width="360"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
 
-            <!-- Кнопка Начать/Продолжить (просто закрывает меню и возвращает к игре) -->
-            <Button Content="Вернуться к игре" 
-                Height="45" 
-                Margin="0,0,0,15" 
-                FontSize="16"
-                Click="ResumeButton_Click"/>
+    <!-- Стили для красивых современных кнопок -->
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#34495E"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#2C3E50"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <!-- Стильный темно-синий градиентный фон -->
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#1A252F" Offset="0.0"/>
+                <GradientStop Color="#2C3E50" Offset="1.0"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <StackPanel Margin="30" VerticalAlignment="Center">
+            <!-- Стилизованный заголовок программы -->
+            <TextBlock Text="Меню" 
+                       FontSize="32" 
+                       FontWeight="Black" 
+                       Foreground="#3498DB" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,5">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="10" Color="#3498DB" Opacity="0.3" ShadowDepth="0"/>
+                </TextBlock.Effect>
+            </TextBlock>
+
+            <TextBlock Text="..." 
+                       FontSize="12" 
+                       Foreground="#BDC3C7" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,35"
+                       FontStyle="Italic"/>
+
+            <!-- Кнопка Инструкция (теперь тут) -->
+            <Button Background="#2980B9" Click="InfoButton_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="📖 " FontSize="16"/>
+                    <TextBlock Text="Инструкция по управлению"/>
+                </StackPanel>
+            </Button>
 
             <!-- Кнопка Настройки -->
-            <Button Content="Настройки и Инструкция" 
-                Height="45" 
-                Margin="0,0,0,15" 
-                FontSize="16"
-                Click="SettingsButton_Click"/>
+            <Button Background="#27AE60" Click="SettingsButton_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⚙️ " FontSize="16"/>
+                    <TextBlock Text="Настройки симуляции"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Разделитель -->
+            <Separator Background="#7F8C8D" Opacity="0.2" Margin="0,10,0,20"/>
 
             <!-- Кнопка Выход -->
-            <Button Content="Выйти из программы" 
-                Height="45" 
-                FontSize="16"
-                Background="#C0392B"
-                Foreground="White"
-                Click="ExitButton_Click"/>
+            <Button Background="#C0392B" Click="ExitButton_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="❌ " FontSize="14"/>
+                    <TextBlock Text="Выйти из программы"/>
+                </StackPanel>
+            </Button>
         </StackPanel>
     </Grid>
 </Window>

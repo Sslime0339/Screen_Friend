@@ -15,7 +15,9 @@ namespace VirtualFriend.Scripts
         private const int VK_ESCAPE = 0x1B;
         private const int VK_C = 0x43;
         private const int VK_X = 0x58;
-        private const int VK_LBUTTON = 0x01;
+        private const int VK_LBUTTON = 0x01; 
+        private const int VK_I = 0x49;
+
 
         private bool _isLButtonDown = false;
         private bool _isLButtonPressed = false;
@@ -24,6 +26,7 @@ namespace VirtualFriend.Scripts
         private bool _wasLButtonDownLastFrame = false; // Для отслеживания изменений
         private bool _wasCPressed = false;
         private bool _wasXPressed = false;
+        private bool _wasMenuPressed = false;
 
 
         private int _mouseX;
@@ -121,6 +124,14 @@ namespace VirtualFriend.Scripts
             bool isDown = (Win32Native.GetAsyncKeyState(VK_C) & 0x8000) != 0;
             bool pressed = isDown && !_wasCPressed;
             _wasCPressed = isDown;
+            return pressed;
+        }
+
+        public bool IsMenuPressed()
+        {
+            bool isDown = (Win32Native.GetAsyncKeyState(VK_I) & 0x8000) != 0;
+            bool pressed = isDown && !_wasMenuPressed;
+            _wasMenuPressed = isDown;
             return pressed;
         }
 

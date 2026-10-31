@@ -22,26 +22,21 @@ namespace VirtualFriend.Views
             InitializeComponent();
         }
 
-        // Кнопка "Вернуться к игре" просто закрывает главное меню
-        private void ResumeButton_Click(object sender, RoutedEventArgs e)
+        // Кнопка открывает созданное ранее окно InfoWindow напрямую из главного меню
+        private void InfoButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            InfoWindow infoWindow = new InfoWindow();
+            infoWindow.Owner = this; // Привязываем к главному меню
+            infoWindow.ShowDialog();
         }
 
-        // Кнопка "Настройки" открывает окно настроек поверх меню
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            //SettingsWindow settings = new SettingsWindow();
-
-            // Устанавливаем MainWindow в качестве владельца. 
-            // Это нужно, чтобы настройки не ушли НАД или ПОД главное меню случайным образом
-            //settings.Owner = this;
-
-            // ShowDialog открывает окно как модальное (блокирует главное меню, пока настройки не закроют)
-            //settings.ShowDialog();
+            SettingsWindow settings = new SettingsWindow();
+            settings.Owner = this;
+            settings.ShowDialog();
         }
 
-        // Кнопка "Выход" полностью закрывает приложение (вместе с Raylib)
         private void ExitButton_Click(object sender, RoutedEventArgs e)
         {
             System.Windows.Application.Current.Shutdown();

@@ -1,0 +1,35 @@
+﻿<Window x:Class="VirtualFriend.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:VirtualFriend.Views"
+        mc:Ignorable="d"
+        Title="Параметры" Height="300" Width="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#2C3E50">
+    <Grid Margin="20">
+        <StackPanel VerticalAlignment="Top">
+            <TextBlock Text="Настройки программы" FontSize="22" FontWeight="Bold" Foreground="White" Margin="0,0,0,20" HorizontalAlignment="Center"/>
+
+            <!-- Блок опций -->
+            <StackPanel Margin="10,0,10,20">
+                <CheckBox x:Name="ChkDebug" Content="Показывать отладочные границы окон (DEBUG)" FontSize="14" Foreground="White" Margin="0,5"/>
+                <CheckBox x:Name="ChkSpawnOnStart" Content="Спавнить коробку автоматически при старте" FontSize="14" Foreground="White" Margin="0,5"/>
+            </StackPanel>
+
+            <!-- Кнопки управления -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <!--
+                <Button Grid.Column="0" Content="Открыть инструкцию" Height="35" Margin="5" Background="#34495E" Foreground="White" Click="OpenInfo_Click"/>
+                -->
+                <Button Grid.Column="1" Content="Сохранить" Height="35" Margin="5" Background="#2ECC71" Foreground="White" FontWeight="Bold" Click="SaveButton_Click"/>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>
