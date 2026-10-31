@@ -290,7 +290,7 @@ namespace VirtualFriend
                 }
 
                 // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
-                _renderEngine.DrawTextWithShadow($"Коробок: {_allGameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
+                //_renderEngine.DrawTextWithShadow($"Коробок: {_allGameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
 
                 _renderEngine.End();
 
