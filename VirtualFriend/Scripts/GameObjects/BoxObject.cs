@@ -104,6 +104,8 @@ namespace VirtualFriend.Scripts.GameObjects
         {
             if (PhysicsBody == null) return;
 
+
+
             // Вычисляем вектор расстояния до мыши
             float targetX = targetWorldPos.X - PhysicsBody.Position.X;
             float targetY = targetWorldPos.Y - PhysicsBody.Position.Y;

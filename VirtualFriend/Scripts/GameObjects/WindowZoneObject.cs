@@ -163,6 +163,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
         private void SpawnMicroWorldContents(World world)
         {
+#if DEBUG
             for (int i = 0; i < 5; i++)
             {
                 SysVector spawnPos = new SysVector(Center.X + (i * 0.2f) - 0.4f, Center.Y - 0.2f);
@@ -170,6 +171,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 newObject.CurrentWindow = this;
                 _microObjects.Add(newObject);
             }
+#endif
         }
 
 

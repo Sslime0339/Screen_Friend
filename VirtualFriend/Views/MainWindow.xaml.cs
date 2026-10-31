@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -68,8 +69,39 @@ namespace VirtualFriend.Views
 
         private void ExitButton_Click(object sender, RoutedEventArgs e)
         {
-            System.Windows.Application.Current.Shutdown();
-            System.Environment.Exit(0);
+            ConfirmAndExit();
+            //System.Windows.Application.Current.Shutdown();
+            //System.Environment.Exit(0);
+        }
+
+        private void Window_Closed(object sender, CancelEventArgs e)
+        {
+            e.Cancel = true;
+            ConfirmAndExit();
+            // 1. Если у вас открыты другие WPF-окна (настройки, подсказки), закрываем их
+            //_activeSettingsWindow?.Close();
+            //_activeInfoWindow?.Close();
+
+            // 2. Полностью убиваем процесс оверлея Raylib + Velcro Physics,
+            // чтобы игра не осталась висеть "невидимкой" в фоновых процессах
+            //System.Environment.Exit(0);
+
+        }
+        
+        private void ConfirmAndExit()
+        {
+            var result = MessageBox.Show("Закрыть программу Виртуальный Друг?", "Выход",
+                                         MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.No)
+            {
+                //e.Cancel = true; // ОТМЕНЯЕМ закрытие, программа продолжает работать
+            }
+            else
+            {
+                // Если пользователь нажал "Да" — завершаем процесс игры
+                System.Environment.Exit(0);
+            }
         }
     }
 }

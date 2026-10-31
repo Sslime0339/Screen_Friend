@@ -7,7 +7,8 @@
         mc:Ignorable="d"
         Title="Виртуальный Друг — Меню" Height="380" Width="360"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanMinimize">
+        ResizeMode="CanMinimize"
+        Closing="Window_Closed">
 
     <!-- Стили для красивых современных кнопок -->
     <Window.Resources>
@@ -75,12 +76,14 @@
             </Button>
 
             <!-- Кнопка Настройки -->
+            <!--
             <Button Background="#27AE60" Click="SettingsButton_Click">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="⚙️ " FontSize="16"/>
                     <TextBlock Text="Настройки симуляции"/>
                 </StackPanel>
             </Button>
+            -->
 
             <!-- Разделитель -->
             <Separator Background="#7F8C8D" Opacity="0.2" Margin="0,10,0,20"/>
@@ -89,7 +92,7 @@
             <Button Background="#C0392B" Click="ExitButton_Click">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="❌ " FontSize="14"/>
-                    <TextBlock Text="Выйти из программы"/>
+                    <TextBlock Text="Завершить программу"/>
                 </StackPanel>
             </Button>
         </StackPanel>

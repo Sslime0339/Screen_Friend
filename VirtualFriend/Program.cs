@@ -151,9 +151,10 @@ namespace VirtualFriend
 
 
 
-
+#if DEBUG
             GameObject newObj = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, new SysVector(30, 5), 5);
             _desktopGameObjects.Add(newObj);
+#endif
 
 
 
@@ -337,7 +338,11 @@ namespace VirtualFriend
             if (_inputManager.IsSpawnPressed())
             {
                 SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
-                float boxSize = 1.0f;
+                float boxSize;
+                if (Random.Shared.Next(10) == 0)
+                    boxSize = 0.5f;
+                else
+                    boxSize = 1.0f;
                 BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
                 _desktopGameObjects.Add(newBox);
                 HandleObjectTeleportation(newBox, mouseWorldPos, new XnaVector(0,0));
