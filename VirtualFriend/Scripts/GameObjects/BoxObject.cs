@@ -100,7 +100,7 @@ namespace VirtualFriend.Scripts.GameObjects
             // Layer = DrawLayer.Characters;
         }
 
-        public void OnDrag(XnaVector targetWorldPos, float responsiveness)
+        public void OnDrag(XnaVector targetWorldPos, float responsiveness, float scrollDelta, float dt)
         {
             if (PhysicsBody == null) return;
 
@@ -113,6 +113,29 @@ namespace VirtualFriend.Scripts.GameObjects
                 targetX * responsiveness,
                 targetY * responsiveness
             );
+
+            float _targetRotation = PhysicsBody.Rotation;
+
+            // --- 2. ВРАЩЕНИЕ (Через угловую скорость) ---
+            // Изменяем целевой угол при прокрутке колесика (например, шаг в 15 градусов)
+            if (Math.Abs(scrollDelta) > 0.01f)
+            {
+                float angleStep = 50f * ((float)Math.PI / 180f); // переводим в радианы
+                _targetRotation += Math.Sign(scrollDelta) * angleStep;
+            }
+
+            // Вычисляем разницу между целевым и текущим углами
+            float angleError = _targetRotation - PhysicsBody.Rotation;
+
+            // Нормализуем разницу углов в диапазон от -PI до PI, чтобы объект крутился по кратчайшему пути
+            angleError = (float)Math.Atan2(Math.Sin(angleError), Math.Cos(angleError));
+
+            // Жесткость вращения (чем выше, тем быстрее объект принимает нужный угол)
+            float angularResponsiveness = 20f;
+
+            // Формула сглаживания для угловой скорости, аналогичная физике перемещения окон
+            float factor = 1f - (float)Math.Exp(-angularResponsiveness * dt);
+            PhysicsBody.AngularVelocity = (angleError * factor) / dt;
         }
 
         public void OnDragEnd(XnaVector releaseVelocity)

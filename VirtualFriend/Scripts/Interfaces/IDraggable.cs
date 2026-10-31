@@ -18,7 +18,7 @@ namespace VirtualFriend.Scripts.Interfaces
         void OnDragStart();
 
         // Метод самого процесса удержания мыши
-        void OnDrag(Vector2 targetWorldPos, float responsiveness);
+        void OnDrag(Vector2 targetWorldPos, float responsiveness, float scrollDelta, float dt);
 
         // Метод броска объекта (отпускание мыши)
         void OnDragEnd(Vector2 releaseVelocity);

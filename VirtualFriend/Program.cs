@@ -149,7 +149,7 @@ namespace VirtualFriend
                 _inputManager.Update(_allGameObjects, dt, WinUnderMouse);
 
                 // --- Логика управления ящиками и объектами ---
-                HandleInput();
+                HandleInput(dt);
 
                 // Обновление логики объектов
                 for (int i = _allGameObjects.Count - 1; i >= 0; i--)
@@ -291,7 +291,7 @@ namespace VirtualFriend
             screenHeight = GetSystemMetrics(SM_CYSCREEN);
         }
 
-        private static void HandleInput()
+        private static void HandleInput(float dt)
         {
             // --- 1. Создание ящика (Клавиша C) ---
             if (_inputManager.IsSpawnPressed())
@@ -362,11 +362,13 @@ namespace VirtualFriend
             else if (_inputManager.IsLButtonDown() && _draggedObject != null)
             {
                 float mouseWorldVelocityLength = _inputManager.MouseWorldVelocity.Length();
-
                 float responsiveness = 1f * (mouseWorldVelocityLength * mouseWorldVelocityLength * 0.01f + 10);
 
-                // Передаем объекту задачу следовать за курсором
-                _draggedObject.OnDrag(currentMouseWorldXna, responsiveness);
+                // Считываем вертикальное движение колесика мыши (возвращает -1, 0 или 1)
+                float scrollDelta = Raylib.GetMouseWheelMove();
+
+                // Передаем объекту задачу следовать за курсором и крутиться
+                _draggedObject.OnDrag(currentMouseWorldXna, responsiveness, scrollDelta, dt);
             }
 
             // Страховка от потери фокуса Windows
