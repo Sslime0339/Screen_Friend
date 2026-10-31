@@ -40,12 +40,8 @@ namespace VirtualFriend.Scripts
             _pixelsPerMeter = pixelsPerMeter;
         }
 
-        public bool ResizeAndMoveWindow(IntPtr hWnd, int x, int y, int width, int height)
-        {
-            const uint SWP_NOZORDER = 0x0004;
-            const uint SWP_NOACTIVATE = 0x0010;
-            return SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
-        }
+
+
 
         public void Update(float ppm, float dt)
         {
@@ -219,7 +215,5 @@ namespace VirtualFriend.Scripts
 
         public void Stop() => _isRunning = false;
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     }
 }
