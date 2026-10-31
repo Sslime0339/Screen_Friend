@@ -10,14 +10,14 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
-namespace VirtualFriend.Windows
+namespace VirtualFriend.Views
 {
     /// <summary>
-    /// Логика взаимодействия для MainWindow.xaml
+    /// Логика взаимодействия для InfoWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class InfoWindow : Window
     {
-        public MainWindow()
+        public InfoWindow()
         {
             InitializeComponent();
         }

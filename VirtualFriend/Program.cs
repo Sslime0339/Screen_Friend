@@ -14,6 +14,7 @@ using VirtualFriend.Scripts;
 // подключаем другие прстранства имён
 using VirtualFriend.Scripts.GameObjects;
 using VirtualFriend.Scripts.Interfaces;
+using VirtualFriend.Views;
 using static VirtualFriend.Scripts.Win32Native;
 using SysVector = System.Numerics.Vector2;
 using XnaVector = Microsoft.Xna.Framework.Vector2;
@@ -62,6 +63,7 @@ namespace VirtualFriend
 
         private static readonly List<GameObject> _desktopGameObjects = new List<GameObject>();
         private static bool _isRunning = true;
+        private static bool _isMenuWindowOpen = false;
 
         // ИСПОЛЬЗУЕМ ИНТЕРФЕЙС: Храним ссылку на любой таскаемый объект
         private static IDraggable _draggedObject = null;
@@ -133,6 +135,9 @@ namespace VirtualFriend
 
             RenderTexture2D _canvas = Raylib.LoadRenderTexture(screenWidth, screenHeight);
 
+
+
+            OpenMainMenu();
 
 
 
@@ -551,6 +556,32 @@ namespace VirtualFriend
             }
         }
 
+
+        private static void OpenMainMenu()
+        {
+            if (_isMenuWindowOpen) return;
+
+            _isMenuWindowOpen = true;
+
+            Thread wpfThread = new Thread(() =>
+            {
+                if (System.Windows.Application.Current == null)
+                {
+                    new System.Windows.Application();
+                }
+
+                // Создаем и показываем ГЛАВНОЕ МЕНЮ
+                MainWindow mainMenu = new MainWindow();
+
+                // Когда главное меню закрывается, сбрасываем флаг, чтобы его можно было открыть снова
+                mainMenu.Closed += (s, e) => { _isMenuWindowOpen = false; };
+
+                mainMenu.ShowDialog();
+            });
+
+            wpfThread.SetApartmentState(ApartmentState.STA);
+            wpfThread.Start();
+        }
 
     }
 }
