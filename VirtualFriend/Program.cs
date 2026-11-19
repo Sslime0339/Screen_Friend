@@ -428,6 +428,9 @@ namespace VirtualFriend
                 _draggedObject.OnDrag(currentMouseWorldXna, responsiveness, scrollDelta, dt);
             }
 
+
+            // TODO: Сделать нормальную обработку IClickable объектов
+
             // --- 4. КЛИК ПРАВОЙ КНОПКОЙ МЫШИ (ПКМ) ---
             if (_inputManager.IsRButtonPressed())
             {
