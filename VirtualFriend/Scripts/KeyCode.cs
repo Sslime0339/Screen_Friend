@@ -104,6 +104,22 @@ namespace VirtualFriend.Scripts
         LeftControl = 0xA2,
         RightControl = 0xA3,
         LeftAlt = 0xA4,
-        RightAlt = 0xA5
+        RightAlt = 0xA5,
+
+
+
+        // Символы пунктуации (стандартная раскладка US QWERTY)
+        Semicolon = 0xBA,    // ; : (Ж в русской раскладке)
+        Plus = 0xBB,         // = +
+        Comma = 0xBC,        // , < (Б в русской раскладке)
+        Minus = 0xBD,        // - _
+        Period = 0xBE,       // . > (Ю в русской раскладке)
+        Slash = 0xBF,        // / ? (. , в русской раскладке)
+        Tilde = 0xC0,        // ` ~ (Ё в русской раскладке)
+        OpenBracket = 0xDB,  // [ { (Х в русской раскладке)
+        Backslash = 0xDC,    // \ |
+        CloseBracket = 0xDD, // ] } (Ъ в русской раскладке)
+        Quote = 0xDE         // ' " (Э в русской раскладке)
+
     }
 }

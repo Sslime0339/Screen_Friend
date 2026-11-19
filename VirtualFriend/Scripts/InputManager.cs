@@ -97,12 +97,30 @@ namespace VirtualFriend.Scripts
                 _currentKeys[i] = isDown;
 
                 // Если клавиша была нажата только что (и это не кнопка мыши, коды 1..6)
-                if (i > 6 && isDown && !_previousKeys[i])
+                if (i > 6 && isDown && !_previousKeys[i] && !IsModifierKey(i))
                 {
                     RecordKeyPress(i);
                 }
+
             }
         }
+
+
+        private static bool IsModifierKey(int vkCode)
+        {
+            return vkCode == (int)KeyCode.Shift ||
+                   vkCode == (int)KeyCode.Control ||
+                   vkCode == (int)KeyCode.Alt ||
+                   vkCode == (int)KeyCode.LeftShift ||
+                   vkCode == (int)KeyCode.RightShift ||
+                   vkCode == (int)KeyCode.LeftControl ||
+                   vkCode == (int)KeyCode.RightControl ||
+                   vkCode == (int)KeyCode.LeftAlt ||
+                   vkCode == (int)KeyCode.RightAlt;
+        }
+
+
+
 
         private void RecordKeyPress(int vkCode)
         {
@@ -143,6 +161,103 @@ namespace VirtualFriend.Scripts
             _keyHistory.Clear();
             return true;
         }
+
+        /// <summary>
+        /// Проверяет, ввел ли пользователь указанное слово или набор цифр (например, "BOX" или "IDDQD").
+        /// Работает по физическим клавишам независимо от текущей раскладки (RU/EN).
+        /// </summary>
+        public bool CheckWord(string word)
+        {
+            if (string.IsNullOrEmpty(word) || _keyHistory.Count < word.Length)
+                return false;
+
+            int offset = _keyHistory.Count - word.Length;
+
+            for (int i = 0; i < word.Length; i++)
+            {
+                int expectedVk = CharToVirtualKey(word[i]);
+                if (expectedVk == 0 || _keyHistory[offset + i] != expectedVk)
+                {
+                    return false;
+                }
+            }
+
+            // Очищаем историю после успешного ввода
+            _keyHistory.Clear();
+            return true;
+        }
+        private static int CharToVirtualKey(char c)
+        {
+            c = char.ToUpperInvariant(c);
+
+            // 1. Латинские буквы A-Z
+            if (c >= 'A' && c <= 'Z')
+                return c;
+
+            // 2. Цифры верхнего ряда 0-9
+            if (c >= '0' && c <= '9')
+                return c;
+
+            // 3. Полный маппинг русской раскладки (ЙЦУКЕН -> QWERTY) и символов пунктуации
+            return c switch
+            {
+                ' ' => (int)KeyCode.Space,
+
+                // Верхний буквенный ряд (ЙЦУКЕНГШЩЗХЪ)
+                'Й' => (int)KeyCode.Q,
+                'Ц' => (int)KeyCode.W,
+                'У' => (int)KeyCode.E,
+                'К' => (int)KeyCode.R,
+                'Е' => (int)KeyCode.T,
+                'Н' => (int)KeyCode.Y,
+                'Г' => (int)KeyCode.U,
+                'Ш' => (int)KeyCode.I,
+                'Щ' => (int)KeyCode.O,
+                'З' => (int)KeyCode.P,
+                'Х' or '[' or '{' => (int)KeyCode.OpenBracket,
+                'Ъ' or ']' or '}' => (int)KeyCode.CloseBracket,
+
+                // Средний буквенный ряд (ФЫВАПРОЛДЖЭ)
+                'Ф' => (int)KeyCode.A,
+                'Ы' => (int)KeyCode.S,
+                'В' => (int)KeyCode.D,
+                'А' => (int)KeyCode.F,
+                'П' => (int)KeyCode.G,
+                'Р' => (int)KeyCode.H,
+                'О' => (int)KeyCode.J,
+                'Л' => (int)KeyCode.K,
+                'Д' => (int)KeyCode.L,
+                'Ж' or ';' or ':' => (int)KeyCode.Semicolon,
+                'Э' or '\'' or '"' => (int)KeyCode.Quote,
+
+                // Нижний буквенный ряд (ЯЧСМИТЬБЮ)
+                'Я' => (int)KeyCode.Z,
+                'Ч' => (int)KeyCode.X,
+                'С' => (int)KeyCode.C,
+                'М' => (int)KeyCode.V,
+                'И' => (int)KeyCode.B,
+                'Т' => (int)KeyCode.N,
+                'Ь' => (int)KeyCode.M,
+                'Б' or ',' or '<' => (int)KeyCode.Comma,
+                'Ю' or '.' or '>' => (int)KeyCode.Period,
+
+                // Ё и остальные знаки препинания
+                'Ё' or '`' or '~' => (int)KeyCode.Tilde,
+                '/' or '?' => (int)KeyCode.Slash,
+                '=' or '+' => (int)KeyCode.Plus,
+                '-' or '_' => (int)KeyCode.Minus,
+                '\\' or '|' => (int)KeyCode.Backslash,
+
+                _ => 0
+            };
+        }
+
+
+
+
+
+
+
 
 
 
