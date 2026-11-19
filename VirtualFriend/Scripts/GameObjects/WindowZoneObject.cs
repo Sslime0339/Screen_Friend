@@ -30,9 +30,7 @@ namespace VirtualFriend.Scripts.GameObjects
         private readonly World _localWorld;
         private readonly World _bodyWorld;
 
-        // Холст для рисования микромира текущего окна
-        private RenderTexture2D _canvas;
-        private bool _isCanvasInitialized = false;
+
         private readonly float _ppm;
 
 
@@ -45,7 +43,7 @@ namespace VirtualFriend.Scripts.GameObjects
             Width = data.Width;
             Height = data.Height;
             Center = new SysVector(data.CenterX, data.CenterY);
-            ZIndex = data.ZIndex; // Сохраняем ZIndex
+            ZIndex = data.ZIndex;
             _ppm = ppm;
             _bodyWorld = world;
 
@@ -57,9 +55,8 @@ namespace VirtualFriend.Scripts.GameObjects
 
             this.Layer = DrawLayer.Background;
 
-            // Инициализируем текстуру под размер экрана оверлея
-            InitCanvas();
         }
+
 
         private void CreateOuterBody(World world)
         {
@@ -83,14 +80,7 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody = null;
         }
 
-
-        private void InitCanvas()
-        {
-            int screenWidth = Raylib.GetScreenWidth();
-            int screenHeight = Raylib.GetScreenHeight();
-            _canvas = Raylib.LoadRenderTexture(screenWidth, screenHeight);
-            _isCanvasInitialized = true;
-        }
+        
 
         public void UpdatePositionAndSize(WindowManager.WindowData data, float dt) // <-- ДОБАВЛЕН dt ПАРАМЕТР
         {
@@ -209,34 +199,25 @@ namespace VirtualFriend.Scripts.GameObjects
                 obj.Update(dt);
             }
         }
-
-                // В метод Draw передаем список всех активных окон для вычисления перекрытия
-        public void DrawWithMasking(RenderEngine renderer, ResourceManager resourceManager, List<WindowZoneObject> allWindows)
+        public void DrawWithMasking(RenderEngine renderer, ResourceManager resourceManager, List<WindowZoneObject> allWindows, RenderTexture2D sharedCanvas)
         {
-            if (!_isCanvasInitialized || IsDestroyed || !IsShow || _microObjects.Count == 0) return;
+            // ОПТИМИЗАЦИЯ: Не тратим ресурсы GPU, если окно скрыто или в нем нет объектов
+            if (IsDestroyed || !IsShow || _microObjects.Count == 0) return;
 
+            // ШАГ 1: Рисуем внутренние объекты на ОБЩИЙ холст
+            Raylib.BeginTextureMode(sharedCanvas);
+            Raylib.ClearBackground(Color.Blank); // Очищаем от предыдущего окна
 
-            // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace
-            Raylib.BeginTextureMode(_canvas);
-            Raylib.ClearBackground(Color.Blank);
-
-            // --- ОБНОВЛЕНО: ОБРЕЗКА ПО РЕАЛЬНЫМ КООРДИНАТАМ СТЕН ---
             float thisScreenX, thisScreenY, thisScreenW, thisScreenH;
 
             if (_innerWalls.Count == 4)
             {
-                // Берем координаты из физических тел (учитывая толщину стен thickness = 50f)
-                // В BuildInnerBoundaries: 
-                // левая стена центрирована по X = Center.X - Width/2 - thickness/2
-                // верхняя стена центрирована по Y = Center.Y - Height/2 - thickness/2
                 float thickness = 50f;
-
                 float physicsLeftEdge = _innerWalls[2].Position.X + (thickness / 2f);
                 float physicsTopEdge = _innerWalls[1].Position.Y + (thickness / 2f);
                 float physicsRightEdge = _innerWalls[3].Position.X - (thickness / 2f);
                 float physicsBottomEdge = _innerWalls[0].Position.Y - (thickness / 2f);
 
-                // Переводим в экранные пиксели
                 thisScreenX = physicsLeftEdge * _ppm;
                 thisScreenY = physicsTopEdge * _ppm;
                 thisScreenW = (physicsRightEdge - physicsLeftEdge) * _ppm;
@@ -244,56 +225,44 @@ namespace VirtualFriend.Scripts.GameObjects
             }
             else
             {
-                // Запасной вариант, если стены еще не создались
                 thisScreenW = Width * _ppm;
                 thisScreenH = Height * _ppm;
                 thisScreenX = (Center.X * _ppm) - (thisScreenW / 2f);
                 thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
             }
 
-            // Активируем обрезку по реальным физическим границам
             Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
 
-
-            // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
             _microObjects.Sort((a, b) =>
             {
-                // 1. Сначала сравниваем по слою (Layer)
                 int layerCompare = a.Layer.CompareTo(b.Layer);
                 if (layerCompare != 0) return layerCompare;
-
-                // 2. Если слои равны, сортируем по внутреннему ZIndex
                 return a.ZIndex.CompareTo(b.ZIndex);
             });
 
-            renderer.BeginWorldSpace(); // Включаем матрицу камеры
+            renderer.BeginWorldSpace();
             foreach (var obj in _microObjects)
             {
                 obj.Draw(renderer, resourceManager);
             }
             renderer.EndWorldSpace();
 
-            // Выключаем обрезку по границам текущего окна
             Raylib.EndScissorMode();
 
-
-            // ШАГ 2: Вырезаем области окон, которые находятся ВЫШЕ текущего окна (ZIndex меньше)
-            Raylib.BeginBlendMode(BlendMode.Custom); // Включаем стирание контента
+            // ШАГ 2: Вырезаем области окон, которые находятся ВЫШЕ текущего
+            Raylib.BeginBlendMode(BlendMode.Custom);
 
             foreach (var win in allWindows)
             {
                 if (!win.IsShow) continue;
 
-                // Если чужое окно выше нас по иерархии окон Windows (1 — топ)
                 if (win.Hwnd != this.Hwnd && win.ZIndex < this.ZIndex)
                 {
-                    // Переводим метры обратно в пиксели экрана для корректного вырезания
                     float screenW = win.Width * _ppm;
                     float screenH = win.Height * _ppm;
                     float screenX = (win.Center.X * _ppm) - (screenW / 2f);
                     float screenY = (win.Center.Y * _ppm) - (screenH / 2f);
 
-                    // Вырезаем «дыру» на холсте
                     Raylib.DrawRectangleRec(new Rectangle(screenX, screenY, screenW, screenH), Color.Blank);
                 }
             }
@@ -301,26 +270,13 @@ namespace VirtualFriend.Scripts.GameObjects
             Raylib.EndBlendMode();
             Raylib.EndTextureMode();
 
-            // ШАГ 3: Выводим готовую замаскированную текстуру на экран
-            // Текстуры RenderTexture в Raylib инвертированы по вертикали, переворачиваем по Y (-canvas.Texture.Height)
+            // ШАГ 3: Выводим результат с общего холста на экран
             Raylib.DrawTextureRec(
-                _canvas.Texture,
-                new Rectangle(0, 0, _canvas.Texture.Width, -_canvas.Texture.Height),
+                sharedCanvas.Texture,
+                new Rectangle(0, 0, sharedCanvas.Texture.Width, -sharedCanvas.Texture.Height),
                 SysVector.Zero,
                 Color.White
             );
-
-#if DEBUG
-            /*
-            // Отрисовка отладочной рамки самого окна (уже на экране)
-            var rect = new Rectangle((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm, Width * _ppm, Height * _ppm);
-            Raylib.DrawRectangleLinesEx(rect, 1f, Color.Blue);
-
-            renderer.DrawTextWithShadow($"{this.Hwnd}", new SysVector((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm), 24, Color.White);
-
-            DrawWalls();
-            */
-#endif
         }
 
 
@@ -390,11 +346,6 @@ namespace VirtualFriend.Scripts.GameObjects
             ClearInnerBoundaries(_localWorld);
             _localWorld.Clear();
 
-            if (_isCanvasInitialized)
-            {
-                Raylib.UnloadRenderTexture(_canvas);
-                _isCanvasInitialized = false;
-            }
 
             base.Destroy();
         }

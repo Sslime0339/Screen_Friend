@@ -262,6 +262,13 @@ namespace VirtualFriend
                 );
 
 
+                // Отрисовка окон с переиспользованием одного и того же _canvas
+                var activeWindows = _windowManager.GetActiveWindowObjects();
+                foreach (var obj in activeWindows)
+                {
+                    // Передаем _canvas как четвертый аргумент
+                    obj.DrawWithMasking(_renderEngine, _resourceManager, activeWindows, _canvas);
+                }
 
 
 
@@ -282,12 +289,13 @@ namespace VirtualFriend
                 }
                 _renderEngine.EndWorldSpace();*/
 
+                /*
                 var activeWindows = _windowManager.GetActiveWindowObjects();
                 foreach (var obj in _windowManager.GetActiveWindowObjects())
                 {
                     // Вызываем кастомный метод отрисовки, передавая ему список всех окон для анализа
                     obj.DrawWithMasking(_renderEngine, _resourceManager, activeWindows);
-                }
+                }*/
 
                 // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
                 //_renderEngine.DrawTextWithShadow($"Коробок: {_allGameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
@@ -296,6 +304,7 @@ namespace VirtualFriend
                 Raylib.DrawFPS(10, 10);
 #endif
 
+                Raylib.DrawFPS(10, 10);
 
                 _renderEngine.End();
 
