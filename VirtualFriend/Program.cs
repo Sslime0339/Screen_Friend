@@ -289,7 +289,6 @@ namespace VirtualFriend
                 // Здесь можно рисовать UI-текст или отладочные рамки
                 // _renderEngine.DrawTextWithShadow(...);
 
-                _renderEngine.End();
 
 
 
