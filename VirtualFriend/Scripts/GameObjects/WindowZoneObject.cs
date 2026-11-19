@@ -202,6 +202,11 @@ namespace VirtualFriend.Scripts.GameObjects
         // Новый сверхбыстрый метод отрисовки с использованием буфера глубины
         public void DrawWithDepthMask(RenderEngine renderer, ResourceManager resourceManager, float depthZ)
         {
+
+            // TODO: проверить код от нейронки для отрисовки в WindowZoneObject
+
+
+
             if (IsDestroyed || !IsShow) return;
 
             float thisScreenX, thisScreenY, thisScreenW, thisScreenH;
@@ -227,8 +232,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 thisScreenX = (Center.X * _ppm) - (thisScreenW / 2f);
                 thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
             }
-
-            // 1. РИСУЕМ ОБЪЕКТЫ ВНУТРИ ОКНА (только если они есть!)
+            // 1. РИСУЕМ ОБЪЕКТЫ ВНУТРИ ОКНА
             if (_microObjects.Count > 0)
             {
                 _microObjects.Sort((a, b) =>
@@ -238,38 +242,32 @@ namespace VirtualFriend.Scripts.GameObjects
                     return a.ZIndex.CompareTo(b.ZIndex);
                 });
 
-                // Сбрасываем буфер отрисовки перед сменой матрицы глубины
+                Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
+
+                renderer.BeginWorldSpace(); // Сначала запускаем камеру!
                 Rlgl.DrawRenderBatchActive();
                 Rlgl.PushMatrix();
-                // Сдвигаем объекты окна на нужную глубину Z
-                Rlgl.Translatef(0f, 0f, depthZ);
-
-                Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
-                renderer.BeginWorldSpace();
+                Rlgl.Translatef(0f, 0f, depthZ); // Теперь сдвигаем по Z внутри мирового пространства
 
                 foreach (var obj in _microObjects)
                 {
                     obj.Draw(renderer, resourceManager);
                 }
 
-                renderer.EndWorldSpace();
-                Raylib.EndScissorMode();
-
                 Rlgl.DrawRenderBatchActive();
                 Rlgl.PopMatrix();
+                renderer.EndWorldSpace();
+
+                Raylib.EndScissorMode();
             }
 
-            // 2. ЗАПЕЧАТЫВАЕМ ОКНО В БУФЕР ГЛУБИНЫ (Masking)
-            // Этот блок выполняется даже для пустых окон, чтобы они перекрывали окна позади себя и рабочий стол
+            // 2. ЗАПЕЧАТЫВАЕМ ОКНО В БУФЕР ГЛУБИНЫ
             Rlgl.DrawRenderBatchActive();
-
-            // Отключаем запись цвета (рисуем невидимо), но запись в Depth Buffer остается включенной!
             Rlgl.ColorMask(false, false, false, false);
 
             Rlgl.PushMatrix();
             Rlgl.Translatef(0f, 0f, depthZ);
 
-            // Рисуем невидимый прямоугольник по реальным границам окна Windows
             float winScreenW = Width * _ppm;
             float winScreenH = Height * _ppm;
             float winScreenX = (Center.X * _ppm) - (winScreenW / 2f);
@@ -280,7 +278,6 @@ namespace VirtualFriend.Scripts.GameObjects
             Rlgl.DrawRenderBatchActive();
             Rlgl.PopMatrix();
 
-            // Возвращаем нормальную отрисовку цвета
             Rlgl.ColorMask(true, true, true, true);
         }
 

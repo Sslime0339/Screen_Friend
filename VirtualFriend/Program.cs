@@ -182,7 +182,7 @@ namespace VirtualFriend
 
 
 
-            RenderTexture2D _canvas = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+            //RenderTexture2D _canvas = Raylib.LoadRenderTexture(screenWidth, screenHeight);
 
 
 
@@ -233,10 +233,15 @@ namespace VirtualFriend
 
 
 
+                // TODO: Проверить код от нейронки для отрисовки в главном циклесс
+
+
                 // В главном цикле while (_isRunning) вместо старого блока с _canvas:
 
                 Raylib.BeginDrawing();
-                Raylib.ClearBackground(Color.Blank);
+                Raylib.ClearBackground(Color.Blank); 
+                
+
 
                 // Включаем аппаратный тест глубины и очищаем буфер глубины каждый кадр
                 Rlgl.EnableDepthTest();
@@ -250,15 +255,12 @@ namespace VirtualFriend
                 int winCount = activeWindows.Count;
                 for (int i = 0; i < winCount; i++)
                 {
-                    // Вычисляем глубину Z в безопасном диапазоне [-0.1f ... -0.9f]
-                    // Чем меньше индекс i (выше окно), тем ближе к камере (ближе к -0.1f)
-                    float depthZ = -0.1f - (0.8f * i / Math.Max(1, winCount));
+                    // диапозон от 0 до 1
+                    float depthZ = 0.9f - (0.8f * i / Math.Max(1, winCount));
 
                     activeWindows[i].DrawWithDepthMask(_renderEngine, _resourceManager, depthZ);
                 }
 
-                // 3. Рисуем объекты РАБОЧЕГО СТОЛА на самой дальней глубине (-0.95f)
-                // Видеокарта сама обрежет всё, что попало за прямоугольники окон!
                 _desktopGameObjects.Sort((a, b) =>
                 {
                     int layerCompare = a.Layer.CompareTo(b.Layer);
@@ -266,11 +268,12 @@ namespace VirtualFriend
                     return a.ZIndex.CompareTo(b.ZIndex);
                 });
 
-                Rlgl.DrawRenderBatchActive();
-                Rlgl.PushMatrix();
-                Rlgl.Translatef(0f, 0f, -0.95f);
 
                 _renderEngine.BeginWorldSpace();
+                Rlgl.DrawRenderBatchActive();
+                Rlgl.PushMatrix(); 
+                Rlgl.Translatef(0f, 0f, 0.05f);
+
                 foreach (var obj in _desktopGameObjects)
                 {
                     if (!(obj is WindowZoneObject))
@@ -278,10 +281,10 @@ namespace VirtualFriend
                         obj.Draw(_renderEngine, _resourceManager);
                     }
                 }
-                _renderEngine.EndWorldSpace();
 
                 Rlgl.DrawRenderBatchActive();
                 Rlgl.PopMatrix();
+                _renderEngine.EndWorldSpace();
 
                 // 4. Выключаем тест глубины для отрисовки UI поверх всего (depthZ = 0)
                 Rlgl.DisableDepthTest();
