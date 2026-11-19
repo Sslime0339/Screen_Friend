@@ -14,7 +14,6 @@ namespace VirtualFriend.Scripts
         private readonly World _physicsWorld;
         private readonly float _pixelsPerMeter;
 
-        // --- СОБЫТИЯ ДЛЯ ВЫТАЛКИВАНИЯ И ЗАСАСЫВАНИЯ ОБЪЕКТОВ ---
         public event Action<WindowZoneObject> OnWindowMinimized;
         public event Action<WindowZoneObject> OnWindowMaximized;
 
@@ -27,10 +26,20 @@ namespace VirtualFriend.Scripts
             public float CenterY;
             public int ZIndex;
             public bool IsMinimized;
-            public bool IsMaximized; // <-- Добавили флаг максимизации
+            public bool IsMaximized;
         }
 
-        private List<WindowData> _pendingWindows = new List<WindowData>();
+        // Двойная буферизация списков: избегаем аллокаций каждые 100 мс
+        private List<WindowData> _frontBuffer = new List<WindowData>(32);
+        private List<WindowData> _backBuffer = new List<WindowData>(32);
+
+        // Переиспользуемые объекты для Win32 API (0 аллокаций в цикле)
+        private readonly StringBuilder _sharedStringBuilder = new StringBuilder(256);
+        private Win32Native.WINDOWPLACEMENT _sharedPlacement = new Win32Native.WINDOWPLACEMENT
+        {
+            length = Marshal.SizeOf(typeof(Win32Native.WINDOWPLACEMENT))
+        };
+
         private readonly object _lock = new object();
         private bool _isRunning = true;
 
@@ -40,77 +49,81 @@ namespace VirtualFriend.Scripts
             _pixelsPerMeter = pixelsPerMeter;
         }
 
-
-
-
         public void Update(float ppm, float dt)
         {
-            List<WindowData> snapshot = GetWindowsSnapshot();
-
-            for (int i = _activeWindowObjects.Count - 1; i >= 0; i--)
+            // Блокируем поток только на время чтения актуального списка
+            lock (_lock)
             {
-                var activeWin = _activeWindowObjects[i];
-                if (!snapshot.Exists(w => w.Hwnd == activeWin.Hwnd))
+                for (int i = _activeWindowObjects.Count - 1; i >= 0; i--)
                 {
-                    // Выталкиваем объекты перед полным уничтожением окна из системы
-                    OnWindowMinimized?.Invoke(activeWin);
-                    activeWin.Destroy();
-                    _activeWindowObjects.RemoveAt(i);
-                }
-            }
-
-            foreach (var data in snapshot)
-            {
-                var existingWindow = _activeWindowObjects.Find(w => w.Hwnd == data.Hwnd);
-                if (existingWindow == null)
-                {
-                    if (!data.IsMinimized)
+                    var activeWin = _activeWindowObjects[i];
+                    bool exists = false;
+                    for (int j = 0; j < _frontBuffer.Count; j++)
                     {
-                        var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data, ppm);
-                        _activeWindowObjects.Add(newWindowObj);
-
-                        if (data.IsMaximized)
+                        if (_frontBuffer[j].Hwnd == activeWin.Hwnd)
                         {
-                            newWindowObj.WasMaximized = true; // Выставляем флаг
-                            OnWindowMaximized?.Invoke(newWindowObj);
+                            exists = true;
+                            break;
                         }
                     }
-                }
-                else
-                {
-                    if (data.IsMinimized)
+
+                    if (!exists)
                     {
-                        if (existingWindow.IsShow)
+                        OnWindowMinimized?.Invoke(activeWin);
+                        activeWin.Destroy();
+                        _activeWindowObjects.RemoveAt(i);
+                    }
+                }
+
+                foreach (var data in _frontBuffer)
+                {
+                    var existingWindow = _activeWindowObjects.Find(w => w.Hwnd == data.Hwnd);
+                    if (existingWindow == null)
+                    {
+                        if (!data.IsMinimized)
                         {
-                            existingWindow.Hide();
-                            // Сбрасываем флаг при сворачивании
-                            existingWindow.WasMaximized = false;
-                            OnWindowMinimized?.Invoke(existingWindow);
+                            var newWindowObj = GameObjectFactory.Instance.CreateWindowZone(_physicsWorld, data, ppm);
+                            _activeWindowObjects.Add(newWindowObj);
+
+                            if (data.IsMaximized)
+                            {
+                                newWindowObj.WasMaximized = true;
+                                OnWindowMaximized?.Invoke(newWindowObj);
+                            }
                         }
                     }
                     else
                     {
-                        if (!existingWindow.IsShow)
+                        if (data.IsMinimized)
                         {
-                            existingWindow.Show();
+                            if (existingWindow.IsShow)
+                            {
+                                existingWindow.Hide();
+                                existingWindow.WasMaximized = false;
+                                OnWindowMinimized?.Invoke(existingWindow);
+                            }
                         }
-
-                        existingWindow.UpdatePositionAndSize(data, dt);
-
-                        // --- ИСПРАВЛЕННОЕ УСЛОВИЕ: Срабатывает только при изменении состояния ---
-                        if (data.IsMaximized && !existingWindow.WasMaximized)
+                        else
                         {
-                            existingWindow.WasMaximized = true; // Запоминаем, что окно уже обработано
-                            OnWindowMaximized?.Invoke(existingWindow);
-                        }
-                        else if (!data.IsMaximized)
-                        {
-                            // Если окно сняли с полноэкранного режима, сбрасываем флаг
-                            existingWindow.WasMaximized = false;
+                            if (!existingWindow.IsShow)
+                            {
+                                existingWindow.Show();
+                            }
+
+                            existingWindow.UpdatePositionAndSize(data, dt);
+
+                            if (data.IsMaximized && !existingWindow.WasMaximized)
+                            {
+                                existingWindow.WasMaximized = true;
+                                OnWindowMaximized?.Invoke(existingWindow);
+                            }
+                            else if (!data.IsMaximized)
+                            {
+                                existingWindow.WasMaximized = false;
+                            }
                         }
                     }
                 }
-
             }
         }
 
@@ -119,93 +132,86 @@ namespace VirtualFriend.Scripts
             _ = Task.Run(async () =>
             {
                 IntPtr shellWindow = Win32Native.GetShellWindow();
+                float invPpm = 1f / _pixelsPerMeter; // Умножение быстрее деления в цикле
 
                 while (_isRunning)
                 {
                     int zCounter = 0;
-                    List<WindowData> currentWindows = new List<WindowData>();
+                    _backBuffer.Clear(); // Очищаем буфер без освобождения памяти
 
                     Win32Native.EnumWindows((hWnd, lParam) =>
                     {
-                        if (hWnd == ReylibHWnd) return true;
+                        // 1. САМЫЕ БЫСТРЫЕ ПРОВЕРКИ (мгновенный отсев в ядре ОС)
+                        if (hWnd == ReylibHWnd || hWnd == shellWindow) return true;
 
                         bool isMinimized = Win32Native.IsIconic(hWnd);
-                        // ИСПОЛЬЗУЕМ СУЩЕСТВУЮЩИЙ МЕТОД ИЗ КЛАССА Win32Native
-                        bool isMaximized = Win32Native.IsZoomed(hWnd);
+                        if (!isMinimized && !Win32Native.IsWindowVisible(hWnd)) return true;
 
-                        if (!Win32Native.IsWindowVisible(hWnd) && !isMinimized) return true;
-                        if (hWnd == shellWindow) return true;
+                        int style = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_STYLE);
+                        if ((style & Win32Native.WS_DISABLED) != 0) return true;
 
-                        StringBuilder sb = new StringBuilder(256);
-                        Win32Native.GetWindowText(hWnd, sb, sb.Capacity);
-                        if (string.IsNullOrWhiteSpace(sb.ToString())) return true;
+                        int exStyle = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_EXSTYLE);
+                        if ((exStyle & Win32Native.WS_EX_TOOLWINDOW) != 0) return true;
 
-                        Win32Native.DwmGetWindowAttribute(hWnd, Win32Native.DWMWA_CLOAKED, out bool isCloaked, sizeof(bool));
-                        if (isCloaked) return true;
+                        // 2. ПРОВЕРКА ДЛИНЫ ЗАГОЛОВКА (без выделения памяти под строку)
+                        if (Win32Native.GetWindowTextLength(hWnd) == 0) return true;
 
+                        // 3. ПРОВЕРКА КООРДИНАТ И РАЗМЕРОВ
                         if (!Win32Native.GetExactWindowRect(hWnd, out Win32Native.RECT rect)) return true;
 
                         int width = rect.Right - rect.Left;
                         int height = rect.Bottom - rect.Top;
 
-                        if (!isMinimized)
+                        if (!isMinimized && (width <= 16 || height <= 16 || rect.Left < -10000 || rect.Top < -10000))
+                            return true;
+
+                        // 4. БОЛЕЕ ДОРОГИЕ DWM-ПРОВЕРКИ (только для оставшихся реальных окон)
+                        Win32Native.DwmGetWindowAttribute(hWnd, Win32Native.DWMWA_CLOAKED, out int cloakedVal, sizeof(int));
+                        if (cloakedVal != 0) return true;
+
+                        if (Win32Native.GetWindowPlacement(hWnd, ref _sharedPlacement) && _sharedPlacement.showCmd == 0)
+                            return true;
+
+                        // 5. ПРОВЕРКА ИМЕНИ КЛАССА (переиспользуем StringBuilder)
+                        _sharedStringBuilder.Clear();
+                        Win32Native.GetClassName(hWnd, _sharedStringBuilder, _sharedStringBuilder.Capacity);
+
+                        // Сравниваем без создания лишних string, где возможно
+                        if (_sharedStringBuilder.Equals("Progman") ||
+                            _sharedStringBuilder.Equals("WorkerW") ||
+                            _sharedStringBuilder.Equals("Windows.UI.Core.CoreWindow"))
                         {
-                            if (width <= 16 || height <= 16 || rect.Left < -10000 || rect.Top < -10000) return true;
-                        }
-
-                        int style = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_STYLE);
-                        if ((style & Win32Native.WS_DISABLED) != 0) return true;
-
-                        Win32Native.WINDOWPLACEMENT placement = new Win32Native.WINDOWPLACEMENT();
-                        placement.length = Marshal.SizeOf(placement);
-                        if (Win32Native.GetWindowPlacement(hWnd, ref placement))
-                        {
-                            if (placement.showCmd == 0) return true;
-                        }
-
-                        StringBuilder sbClass = new StringBuilder(256);
-                        Win32Native.GetClassName(hWnd, sbClass, sbClass.Capacity);
-                        string className = sbClass.ToString();
-
-                        if (className == "Windows.UI.Core.CoreWindow" ||
-                            className == "Progman" ||
-                            className == "WorkerW") return true;
-
-                        int exStyle = Win32Native.GetWindowLong(hWnd, Win32Native.GWL_EXSTYLE);
-                        if ((exStyle & Win32Native.WS_EX_TOOLWINDOW) != 0) return true;
-
-                        if (className == "ApplicationFrameWindow")
-                        {
-                            Win32Native.DwmGetWindowAttribute(hWnd, Win32Native.DWMWA_CLOAKED, out int cloakedVal, sizeof(int));
-                            if (cloakedVal != 0) return true;
+                            return true;
                         }
 
                         zCounter++;
 
-                        currentWindows.Add(new WindowData
+                        _backBuffer.Add(new WindowData
                         {
                             Hwnd = hWnd,
-                            Width = width / _pixelsPerMeter,
-                            Height = height / _pixelsPerMeter,
-                            CenterX = (rect.Left + width / 2f) / _pixelsPerMeter,
-                            CenterY = (rect.Top + height / 2f) / _pixelsPerMeter,
+                            Width = width * invPpm,
+                            Height = height * invPpm,
+                            CenterX = (rect.Left + width * 0.5f) * invPpm,
+                            CenterY = (rect.Top + height * 0.5f) * invPpm,
                             ZIndex = zCounter,
                             IsMinimized = isMinimized,
-                            IsMaximized = isMaximized
+                            IsMaximized = Win32Native.IsZoomed(hWnd)
                         });
 
                         return true;
                     }, IntPtr.Zero);
 
-                    lock (_lock) { _pendingWindows = currentWindows; }
+                    // Меняем буферы местами за O(1) — без копирования элементов
+                    lock (_lock)
+                    {
+                        var temp = _frontBuffer;
+                        _frontBuffer = _backBuffer;
+                        _backBuffer = temp;
+                    }
+
                     await Task.Delay(100);
                 }
             });
-        }
-
-        public List<WindowData> GetWindowsSnapshot()
-        {
-            lock (_lock) { return new List<WindowData>(_pendingWindows); }
         }
 
         public List<WindowZoneObject> GetActiveWindowObjects()
@@ -214,6 +220,6 @@ namespace VirtualFriend.Scripts
         }
 
         public void Stop() => _isRunning = false;
-
     }
+
 }

@@ -21,6 +21,29 @@ using XnaVector = Microsoft.Xna.Framework.Vector2;
 
 
 
+
+// ---------------------
+// ---------------------
+// ---------------------
+
+
+
+
+// TODO: Сделать оптимизацию при большом количестве окон
+
+
+
+
+// ---------------------
+// ---------------------
+// ---------------------
+
+
+
+
+
+
+
 // TODO: Сделать перемещение окон через скорость а не телепортацию по позиции, и вынести эту функцию
 
 
@@ -261,7 +284,7 @@ namespace VirtualFriend
                     Color.White
                 );
 
-
+                
                 // Отрисовка окон с переиспользованием одного и того же _canvas
                 var activeWindows = _windowManager.GetActiveWindowObjects();
                 foreach (var obj in activeWindows)
@@ -269,7 +292,7 @@ namespace VirtualFriend
                     // Передаем _canvas как четвертый аргумент
                     obj.DrawWithMasking(_renderEngine, _resourceManager, activeWindows, _canvas);
                 }
-
+                
 
 
 
