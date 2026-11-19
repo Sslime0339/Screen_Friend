@@ -91,6 +91,11 @@ namespace VirtualFriend
 
         // ИСПОЛЬЗУЕМ ИНТЕРФЕЙС: Храним ссылку на любой таскаемый объект
         private static IDraggable _draggedObject = null;
+        
+        // Внутри класса Program добавьте поля:
+        private static float _spawnTimer = 0f;
+        private const float SpawnInterval = 0.08f; // Интервал в секундах (примерно 12 коробок в секунду)
+
 
         static void Main(string[] args)
         {
@@ -366,21 +371,35 @@ namespace VirtualFriend
             { 
                 if (!_isMenuWindowOpen) _isRunning = false;
             }
-            
 
-
-            // --- 1. Создание ящика (Клавиша C) ---
-            if (_inputManager.IsSpawnPressed())
+            // Непрерывный спавн на C
+            if (_inputManager.IsKeyPressed(KeyCode.C))
             {
+                SpawnBoxAtMouse();
+                _spawnTimer = 0f;
+            }
+            else if (_inputManager.IsKeyDown(KeyCode.C))
+            {
+                _spawnTimer += dt;
+                if (_spawnTimer >= SpawnInterval)
+                {
+                    SpawnBoxAtMouse();
+                    _spawnTimer = 0f;
+                }
+            }
+            else
+            {
+                _spawnTimer = 0f;
+            }
+
+            // Секретная комбинация читается как обычный текст
+            if (_inputManager.CheckSequence(KeyCode.B, KeyCode.O, KeyCode.X))
+            {
+                // Секретное действие: например, спавн гигантской коробки
                 SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
-                float boxSize;
-                if (Random.Shared.Next(10) == 0)
-                    boxSize = 0.5f;
-                else
-                    boxSize = 1.0f;
-                BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
-                _desktopGameObjects.Add(newBox);
-                HandleObjectTeleportation(newBox, mouseWorldPos, new XnaVector(0,0));
+                BoxObject giantBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, 3.0f);
+                _desktopGameObjects.Add(giantBox);
+                HandleObjectTeleportation(giantBox, mouseWorldPos, new XnaVector(0, 0));
             }
 
             // --- 2. Очистка сцены (Клавиша X) ---
@@ -495,6 +514,21 @@ namespace VirtualFriend
                 _draggedObject = null;
             }
         }
+
+
+
+        private static void SpawnBoxAtMouse()
+        {
+            SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
+            float boxSize = Random.Shared.Next(10) == 0 ? 0.5f : 1.0f;
+
+            BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
+            _desktopGameObjects.Add(newBox);
+            HandleObjectTeleportation(newBox, mouseWorldPos, new XnaVector(0, 0));
+        }
+
+
+
         private static void HandleObjectTeleportation(GameObject obj, SysVector currentMouseWorld, XnaVector releaseVelocity)
         {
             if (obj is ITeleportable teleportableObj)
