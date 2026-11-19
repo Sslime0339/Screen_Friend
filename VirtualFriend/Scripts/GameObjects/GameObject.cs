@@ -21,7 +21,7 @@ namespace VirtualFriend.Scripts.GameObjects
         public abstract void Update(float dt);
         public abstract void Draw(RenderEngine renderer, ResourceManager resourceManager);
 
-        public virtual void Destroy(World world) // TODO: убрать ссылку на world
+        public virtual void Destroy()
         {
             IsDestroyed = true;
             if (PhysicsBody != null)

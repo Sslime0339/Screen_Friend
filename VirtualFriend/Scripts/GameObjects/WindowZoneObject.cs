@@ -213,7 +213,8 @@ namespace VirtualFriend.Scripts.GameObjects
                 // В метод Draw передаем список всех активных окон для вычисления перекрытия
         public void DrawWithMasking(RenderEngine renderer, ResourceManager resourceManager, List<WindowZoneObject> allWindows)
         {
-            if (!_isCanvasInitialized || IsDestroyed || !IsShow) return;
+            if (!_isCanvasInitialized || IsDestroyed || !IsShow || _microObjects.Count == 0) return;
+
 
             // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace
             Raylib.BeginTextureMode(_canvas);
@@ -310,6 +311,7 @@ namespace VirtualFriend.Scripts.GameObjects
             );
 
 #if DEBUG
+            /*
             // Отрисовка отладочной рамки самого окна (уже на экране)
             var rect = new Rectangle((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm, Width * _ppm, Height * _ppm);
             Raylib.DrawRectangleLinesEx(rect, 1f, Color.Blue);
@@ -317,6 +319,7 @@ namespace VirtualFriend.Scripts.GameObjects
             renderer.DrawTextWithShadow($"{this.Hwnd}", new SysVector((Center.X - Width / 2f) * _ppm, (Center.Y - Height / 2f) * _ppm), 24, Color.White);
 
             DrawWalls();
+            */
 #endif
         }
 
@@ -380,9 +383,9 @@ namespace VirtualFriend.Scripts.GameObjects
             // Этот метод оставляем пустым или вызываем базовый, так как основная логика теперь в DrawWithMasking
         }
 
-        public override void Destroy(World world)
+        public override void Destroy()
         {
-            foreach (var obj in _microObjects) obj.Destroy(_localWorld);
+            foreach (var obj in _microObjects) obj.Destroy();
             _microObjects.Clear();
             ClearInnerBoundaries(_localWorld);
             _localWorld.Clear();
@@ -393,7 +396,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 _isCanvasInitialized = false;
             }
 
-            base.Destroy(world);
+            base.Destroy();
         }
 
 

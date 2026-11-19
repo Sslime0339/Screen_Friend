@@ -87,6 +87,35 @@ namespace VirtualFriend.Scripts.GameObjects
             // Логика при простом клике (если нужна в будущем)
         }
 
+
+        // Прикольная идея нейронки
+        // TODO: когда добавлю меню взаимодействия реализовать тут в ящике
+        // Добавьте в класс BoxObject рядом с OnClick():
+        public void OnRightClick()
+        {
+            if (PhysicsBody == null) return;
+
+            // Подбрасываем коробку вверх и слегка закручиваем
+            PhysicsBody.LinearVelocity = new XnaVector(PhysicsBody.LinearVelocity.X, -8f);
+            PhysicsBody.AngularVelocity = (Random.Shared.NextSingle() - 0.5f) * 10f;
+        }
+
+        public void OnMiddleClick()
+        {
+            if (IsDestroyed) return;
+
+            // Если коробка внутри окна — корректно вытаскиваем её из списка окна перед удалением
+            if (CurrentWindow != null)
+            {
+                CurrentWindow.TeleportOut(this);
+            }
+
+            Destroy();
+        }
+
+
+
+
         // --- Реализация интерфейса IDraggable ---
 
         public void OnDragStart()

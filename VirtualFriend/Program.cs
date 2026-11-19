@@ -292,6 +292,11 @@ namespace VirtualFriend
                 // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
                 //_renderEngine.DrawTextWithShadow($"Коробок: {_allGameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
 
+#if DEBUG
+                Raylib.DrawFPS(10, 10);
+#endif
+
+
                 _renderEngine.End();
 
             }
@@ -355,7 +360,7 @@ namespace VirtualFriend
                 {
                     if (obj is BoxObject)
                     {
-                        obj.Destroy(_physicsSystem.World);
+                        obj.Destroy();
                     }
                 }
                 _draggedObject = null; // Сбрасываем захват при очистке
@@ -421,6 +426,34 @@ namespace VirtualFriend
 
                 // Передаем объекту задачу следовать за курсором и крутиться
                 _draggedObject.OnDrag(currentMouseWorldXna, responsiveness, scrollDelta, dt);
+            }
+
+            // --- 4. КЛИК ПРАВОЙ КНОПКОЙ МЫШИ (ПКМ) ---
+            if (_inputManager.IsRButtonPressed())
+            {
+                WindowZoneObject winUnderMouse = GetTopWindowUnderMouse(currentMouseWorld);
+                foreach (var obj in _allGameObjects)
+                {
+                    if (obj is IClickable clickable && clickable.IsUnderMouse(currentMouseWorld, winUnderMouse))
+                    {
+                        clickable.OnRightClick();
+                        break; // Срабатывает только для верхнего объекта под курсором
+                    }
+                }
+            }
+
+            // --- 5. КЛИК СРЕДНЕЙ КНОПКОЙ МЫШИ (СКМ) ---
+            if (_inputManager.IsMButtonPressed())
+            {
+                WindowZoneObject winUnderMouse = GetTopWindowUnderMouse(currentMouseWorld);
+                for (int i = _allGameObjects.Count - 1; i >= 0; i--)
+                {
+                    if (_allGameObjects[i] is IClickable clickable && clickable.IsUnderMouse(currentMouseWorld, winUnderMouse))
+                    {
+                        clickable.OnMiddleClick();
+                        break;
+                    }
+                }
             }
 
             // Страховка от потери фокуса Windows

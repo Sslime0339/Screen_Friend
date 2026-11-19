@@ -54,7 +54,7 @@ namespace VirtualFriend.Scripts
                 {
                     // Выталкиваем объекты перед полным уничтожением окна из системы
                     OnWindowMinimized?.Invoke(activeWin);
-                    activeWin.Destroy(_physicsWorld);
+                    activeWin.Destroy();
                     _activeWindowObjects.RemoveAt(i);
                 }
             }

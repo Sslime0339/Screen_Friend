@@ -16,14 +16,27 @@ namespace VirtualFriend.Scripts
         private const int VK_C = 0x43;
         private const int VK_X = 0x58;
         private const int VK_LBUTTON = 0x01; 
+        private const int VK_RBUTTON = 0x02;
+        private const int VK_MBUTTON = 0x04;
         private const int VK_I = 0x49;
 
 
         private bool _isLButtonDown = false;
         private bool _isLButtonPressed = false;
         private bool _isLButtonReleased = false;
-
         private bool _wasLButtonDownLastFrame = false; // Для отслеживания изменений
+
+        private bool _isRButtonDown = false;
+        private bool _isRButtonPressed = false;
+        private bool _isRButtonReleased = false;
+        private bool _wasRButtonDownLastFrame = false;
+
+        private bool _isMButtonDown = false;
+        private bool _isMButtonPressed = false;
+        private bool _isMButtonReleased = false;
+        private bool _wasMButtonDownLastFrame = false;
+
+
         private bool _wasCPressed = false;
         private bool _wasXPressed = false;
         private bool _wasMenuPressed = false;
@@ -93,7 +106,7 @@ namespace VirtualFriend.Scripts
             }
             else
             {
-                if (!IsLButtonDown())
+                if (!IsLButtonDown() && !IsRButtonDown() && !IsMButtonDown())
                 {
                     Raylib.SetWindowState(ConfigFlags.MousePassthroughWindow);
                 }
@@ -115,6 +128,20 @@ namespace VirtualFriend.Scripts
 
             // Сохраняем состояние для следующего кадра
             _wasLButtonDownLastFrame = currentDown;
+
+
+            bool currentRDown = (Win32Native.GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+            _isRButtonPressed = currentRDown && !_wasRButtonDownLastFrame;
+            _isRButtonReleased = !currentRDown && _wasRButtonDownLastFrame;
+            _isRButtonDown = currentRDown;
+            _wasRButtonDownLastFrame = currentRDown;
+
+            bool currentMDown = (Win32Native.GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+            _isMButtonPressed = currentMDown && !_wasMButtonDownLastFrame;
+            _isMButtonReleased = !currentMDown && _wasMButtonDownLastFrame;
+            _isMButtonDown = currentMDown;
+            _wasMButtonDownLastFrame = currentMDown;
+
         }
 
         public bool IsExitPressed() => (Win32Native.GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
@@ -142,11 +169,20 @@ namespace VirtualFriend.Scripts
             _wasXPressed = isDown;
             return pressed;
         }
+
+
         public bool IsLButtonDown() => _isLButtonDown;
-
         public bool IsLButtonPressed() => _isLButtonPressed;
-
         public bool IsLButtonReleased() => _isLButtonReleased;
+
+        public bool IsRButtonDown() => _isRButtonDown;
+        public bool IsRButtonPressed() => _isRButtonPressed;
+        public bool IsRButtonReleased() => _isRButtonReleased;
+
+        public bool IsMButtonDown() => _isMButtonDown;
+        public bool IsMButtonPressed() => _isMButtonPressed;
+        public bool IsMButtonReleased() => _isMButtonReleased;
+
 
         public SysVector GetMouseWorldPosition()
         {
