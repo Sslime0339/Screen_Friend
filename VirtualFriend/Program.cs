@@ -233,11 +233,42 @@ namespace VirtualFriend
 
 
 
+                // В главном цикле while (_isRunning) вместо старого блока с _canvas:
 
-                // ШАГ 1: Рисуем внутренние объекты на текстуру в режиме WorldSpace
-                Raylib.BeginTextureMode(_canvas);
+                Raylib.BeginDrawing();
                 Raylib.ClearBackground(Color.Blank);
 
+                // Включаем аппаратный тест глубины и очищаем буфер глубины каждый кадр
+                Rlgl.EnableDepthTest();
+                Rlgl.ClearScreenBuffers(); // Очистит и цвет (Blank), и буфер глубины
+
+                // 1. Сортируем активные окна СВЕРХУ ВНИЗ (ZIndex: 1 -> 2 -> 3...)
+                var activeWindows = _windowManager.GetActiveWindowObjects();
+                activeWindows.Sort((a, b) => a.ZIndex.CompareTo(b.ZIndex));
+
+                // 2. Рисуем окна спереди назад
+                int winCount = activeWindows.Count;
+                for (int i = 0; i < winCount; i++)
+                {
+                    // Вычисляем глубину Z в безопасном диапазоне [-0.1f ... -0.9f]
+                    // Чем меньше индекс i (выше окно), тем ближе к камере (ближе к -0.1f)
+                    float depthZ = -0.1f - (0.8f * i / Math.Max(1, winCount));
+
+                    activeWindows[i].DrawWithDepthMask(_renderEngine, _resourceManager, depthZ);
+                }
+
+                // 3. Рисуем объекты РАБОЧЕГО СТОЛА на самой дальней глубине (-0.95f)
+                // Видеокарта сама обрежет всё, что попало за прямоугольники окон!
+                _desktopGameObjects.Sort((a, b) =>
+                {
+                    int layerCompare = a.Layer.CompareTo(b.Layer);
+                    if (layerCompare != 0) return layerCompare;
+                    return a.ZIndex.CompareTo(b.ZIndex);
+                });
+
+                Rlgl.DrawRenderBatchActive();
+                Rlgl.PushMatrix();
+                Rlgl.Translatef(0f, 0f, -0.95f);
 
                 _renderEngine.BeginWorldSpace();
                 foreach (var obj in _desktopGameObjects)
@@ -249,51 +280,16 @@ namespace VirtualFriend
                 }
                 _renderEngine.EndWorldSpace();
 
+                Rlgl.DrawRenderBatchActive();
+                Rlgl.PopMatrix();
 
+                // 4. Выключаем тест глубины для отрисовки UI поверх всего (depthZ = 0)
+                Rlgl.DisableDepthTest();
 
-                // ШАГ 2: Вырезаем области окон, которые находятся ВЫШЕ текущего окна (ZIndex меньше)
-                Raylib.BeginBlendMode(BlendMode.Custom); // Включаем стирание контента
+                // Здесь можно рисовать UI-текст или отладочные рамки
+                // _renderEngine.DrawTextWithShadow(...);
 
-                foreach (var win in _windowManager.GetActiveWindowObjects())
-                {
-                    if (!win.IsShow) continue;
-
-                    // Переводим метры обратно в пиксели экрана для корректного вырезания
-                    float screenW = win.Width * ppm;
-                    float screenH = win.Height * ppm;
-                    float screenX = (win.Center.X * ppm) - (screenW / 2f);
-                    float screenY = (win.Center.Y * ppm) - (screenH / 2f);
-
-                    // Вырезаем «дыру» на холсте
-                    Raylib.DrawRectangleRec(new Rectangle(screenX, screenY, screenW, screenH), Color.Blank);
-                    
-                }
-
-                Raylib.EndBlendMode();
-                Raylib.EndTextureMode();
-
-
-                Raylib.ClearBackground(Color.Blank);
-
-                // ШАГ 3: Выводим готовую замаскированную текстуру на экран
-                // Текстуры RenderTexture в Raylib инвертированы по вертикали, переворачиваем по Y (-canvas.Texture.Height)
-                Raylib.DrawTextureRec(
-                    _canvas.Texture,
-                    new Rectangle(0, 0, _canvas.Texture.Width, -_canvas.Texture.Height),
-                    SysVector.Zero,
-                    Color.White
-                );
-
-                
-                // Отрисовка окон с переиспользованием одного и того же _canvas
-                var activeWindows = _windowManager.GetActiveWindowObjects();
-                foreach (var obj in activeWindows)
-                {
-                    // Передаем _canvas как четвертый аргумент
-                    obj.DrawWithMasking(_renderEngine, _resourceManager, activeWindows, _canvas);
-                }
-                
-
+                _renderEngine.End();
 
 
 

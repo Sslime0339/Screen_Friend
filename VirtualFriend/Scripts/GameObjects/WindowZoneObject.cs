@@ -199,24 +199,21 @@ namespace VirtualFriend.Scripts.GameObjects
                 obj.Update(dt);
             }
         }
-        public void DrawWithMasking(RenderEngine renderer, ResourceManager resourceManager, List<WindowZoneObject> allWindows, RenderTexture2D sharedCanvas)
+        // Новый сверхбыстрый метод отрисовки с использованием буфера глубины
+        public void DrawWithDepthMask(RenderEngine renderer, ResourceManager resourceManager, float depthZ)
         {
-            // ОПТИМИЗАЦИЯ: Не тратим ресурсы GPU, если окно скрыто или в нем нет объектов
-            if (IsDestroyed || !IsShow || _microObjects.Count == 0) return;
-
-            // ШАГ 1: Рисуем внутренние объекты на ОБЩИЙ холст
-            Raylib.BeginTextureMode(sharedCanvas);
-            Raylib.ClearBackground(Color.Blank); // Очищаем от предыдущего окна
+            if (IsDestroyed || !IsShow) return;
 
             float thisScreenX, thisScreenY, thisScreenW, thisScreenH;
 
             if (_innerWalls.Count == 4)
             {
-                float thickness = 50f;
+                float thickness = 50f; 
                 float physicsLeftEdge = _innerWalls[2].Position.X + (thickness / 2f);
                 float physicsTopEdge = _innerWalls[1].Position.Y + (thickness / 2f);
                 float physicsRightEdge = _innerWalls[3].Position.X - (thickness / 2f);
                 float physicsBottomEdge = _innerWalls[0].Position.Y - (thickness / 2f);
+
 
                 thisScreenX = physicsLeftEdge * _ppm;
                 thisScreenY = physicsTopEdge * _ppm;
@@ -231,52 +228,60 @@ namespace VirtualFriend.Scripts.GameObjects
                 thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
             }
 
-            Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
-
-            _microObjects.Sort((a, b) =>
+            // 1. РИСУЕМ ОБЪЕКТЫ ВНУТРИ ОКНА (только если они есть!)
+            if (_microObjects.Count > 0)
             {
-                int layerCompare = a.Layer.CompareTo(b.Layer);
-                if (layerCompare != 0) return layerCompare;
-                return a.ZIndex.CompareTo(b.ZIndex);
-            });
-
-            renderer.BeginWorldSpace();
-            foreach (var obj in _microObjects)
-            {
-                obj.Draw(renderer, resourceManager);
-            }
-            renderer.EndWorldSpace();
-
-            Raylib.EndScissorMode();
-
-            // ШАГ 2: Вырезаем области окон, которые находятся ВЫШЕ текущего
-            Raylib.BeginBlendMode(BlendMode.Custom);
-
-            foreach (var win in allWindows)
-            {
-                if (!win.IsShow) continue;
-
-                if (win.Hwnd != this.Hwnd && win.ZIndex < this.ZIndex)
+                _microObjects.Sort((a, b) =>
                 {
-                    float screenW = win.Width * _ppm;
-                    float screenH = win.Height * _ppm;
-                    float screenX = (win.Center.X * _ppm) - (screenW / 2f);
-                    float screenY = (win.Center.Y * _ppm) - (screenH / 2f);
+                    int layerCompare = a.Layer.CompareTo(b.Layer);
+                    if (layerCompare != 0) return layerCompare;
+                    return a.ZIndex.CompareTo(b.ZIndex);
+                });
 
-                    Raylib.DrawRectangleRec(new Rectangle(screenX, screenY, screenW, screenH), Color.Blank);
+                // Сбрасываем буфер отрисовки перед сменой матрицы глубины
+                Rlgl.DrawRenderBatchActive();
+                Rlgl.PushMatrix();
+                // Сдвигаем объекты окна на нужную глубину Z
+                Rlgl.Translatef(0f, 0f, depthZ);
+
+                Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
+                renderer.BeginWorldSpace();
+
+                foreach (var obj in _microObjects)
+                {
+                    obj.Draw(renderer, resourceManager);
                 }
+
+                renderer.EndWorldSpace();
+                Raylib.EndScissorMode();
+
+                Rlgl.DrawRenderBatchActive();
+                Rlgl.PopMatrix();
             }
 
-            Raylib.EndBlendMode();
-            Raylib.EndTextureMode();
+            // 2. ЗАПЕЧАТЫВАЕМ ОКНО В БУФЕР ГЛУБИНЫ (Masking)
+            // Этот блок выполняется даже для пустых окон, чтобы они перекрывали окна позади себя и рабочий стол
+            Rlgl.DrawRenderBatchActive();
 
-            // ШАГ 3: Выводим результат с общего холста на экран
-            Raylib.DrawTextureRec(
-                sharedCanvas.Texture,
-                new Rectangle(0, 0, sharedCanvas.Texture.Width, -sharedCanvas.Texture.Height),
-                SysVector.Zero,
-                Color.White
-            );
+            // Отключаем запись цвета (рисуем невидимо), но запись в Depth Buffer остается включенной!
+            Rlgl.ColorMask(false, false, false, false);
+
+            Rlgl.PushMatrix();
+            Rlgl.Translatef(0f, 0f, depthZ);
+
+            // Рисуем невидимый прямоугольник по реальным границам окна Windows
+            float winScreenW = Width * _ppm;
+            float winScreenH = Height * _ppm;
+            float winScreenX = (Center.X * _ppm) - (winScreenW / 2f);
+            float winScreenY = (Center.Y * _ppm) - (winScreenH / 2f);
+
+            Raylib.DrawRectangle((int)winScreenX, (int)winScreenY, (int)winScreenW, (int)winScreenH, Color.White);
+
+            Rlgl.DrawRenderBatchActive();
+            Rlgl.PopMatrix();
+
+            // Возвращаем нормальную отрисовку цвета
+            Rlgl.ColorMask(true, true, true, true);
         }
 
 
