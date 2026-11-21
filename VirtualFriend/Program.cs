@@ -100,7 +100,7 @@ namespace VirtualFriend
         private static float _spawnTimer = 0f;          // Таймер интервала между спавнами
 
         private const float InitialSpawnDelay = 0.4f;   // Задержка перед началом очереди (в секундах)
-        private const float SpawnInterval = 0.08f;      // Интервал спавна в очереди
+        private const float SpawnInterval = 0.10f;      // Интервал спавна в очереди
 
 
 
@@ -221,8 +221,13 @@ namespace VirtualFriend
                 for (int i = _allGameObjects.Count - 1; i >= 0; i--)
                 {
                     _allGameObjects[i].Update(dt);
-                    if (_allGameObjects[i].IsDestroyed) _allGameObjects.RemoveAt(i);
+                    if (_allGameObjects[i].IsDestroyed)
+                    {
+                        _desktopGameObjects.Remove(_allGameObjects[i]);
+                        _allGameObjects.RemoveAt(i);
+                    }
                 }
+
 
                 _windowManager.Update(ppm, dt);
 
@@ -410,7 +415,15 @@ namespace VirtualFriend
                     _spawnTimer += dt;
                     if (_spawnTimer >= SpawnInterval)
                     {
-                        SpawnBoxAtMouse();
+                        float randomX = Random.Shared.NextSingle() * 2.0f - 1.0f;
+                        float randomY = Random.Shared.NextSingle() * 2.0f - 1.0f;
+
+                        AetherVector direction = new AetherVector(randomX, randomY);
+                        direction.Normalize();
+                        float hitPower = 20f;
+
+
+                        SpawnBoxAtMouse(direction * hitPower);
                         _spawnTimer = 0f;
                     }
                 }
@@ -559,7 +572,17 @@ namespace VirtualFriend
             _desktopGameObjects.Add(newBox);
             HandleObjectTeleportation(newBox, mouseWorldPos, new AetherVector(0, 0));
         }
+        private static void SpawnBoxAtMouse(AetherVector vecImpulse)
+        {
+            SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
+            float boxSize = Random.Shared.Next(10) == 0 ? 0.5f : 1.0f;
 
+            BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
+            _desktopGameObjects.Add(newBox);
+            HandleObjectTeleportation(newBox, mouseWorldPos, new AetherVector(0, 0));
+
+            newBox.PhysicsBody.ApplyLinearImpulse(vecImpulse);
+        }
 
 
         private static void HandleObjectTeleportation(GameObject obj, SysVector currentMouseWorld, AetherVector releaseVelocity)

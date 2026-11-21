@@ -20,9 +20,14 @@ namespace VirtualFriend.Scripts.GameObjects
     internal class BoxObject : GameObject, IDraggable, ITeleportable
     {
         private readonly float _size;
-        private int _animFrame = 0;
+        // private int _animFrame = 0;
+        private const float CrushDotThreshold = -0.75f;     // Угол между нормалями > ~140 градусов (сжатие с двух сторон)
+        private const float CrushPenetrationThreshold = 0.06f; // Глубина вдавливания в метрах (подбирается под жесткость стен)
+        private float _accumulatedCrushImpulse = 0f;
+
 
         public float Size => _size;
+
 
         // Конструктор остается прежним...
         public BoxObject(World world, SysVector spawnPos, float size)
@@ -134,24 +139,9 @@ namespace VirtualFriend.Scripts.GameObjects
 
         public void OnMiddleClick()
         {
-            if (IsDestroyed) return;
-
-
-            if (PhysicsBody != null)
-            {
-                SysVector pos = new SysVector(PhysicsBody.Position.X, PhysicsBody.Position.Y);
-                ParticleSystem.Instance.EmitBoxShatter(pos, _size, CurrentWindow);
-            }
-
-
-            // Если коробка внутри окна — корректно вытаскиваем её из списка окна перед удалением
-            if (CurrentWindow != null)
-            {
-                CurrentWindow.TeleportOut(this);
-            }
-
-            Destroy();
+            Shatter();
         }
+
 
 
 
@@ -226,25 +216,124 @@ namespace VirtualFriend.Scripts.GameObjects
         {
             if (PhysicsBody == null || IsDestroyed) return;
 
-            // Берем текущие координаты ящика из физического тела
+            // 1. Проверка на раздавливание (тиски)
+            if (IsCrushed())
+            {
+                Shatter();
+                return;
+            }
+
+            // 2. Существующая сортировка отрисовки
             float x = PhysicsBody.Position.X;
             float y = PhysicsBody.Position.Y;
-
-            //float Cos5 = (float)Math.Cos(5.0 * Math.PI / 180.0);
-            //float Sin5 = (float)Math.Sin(5.0 * Math.PI / 180.0);
-
-            // Считаем проекцию по вашей формуле
-            //float rawSortKey = y * Cos5 - x * Sin5;
-            //object.screenY + (object.screenX * 0.087);
-
-            float halfSize = _size / 2f;
-
-            float rawSortKey = (y) - (x);
-
-            // Инвертируем, чтобы верхние объекты (меньший Y) имели больший ZIndex и рисовались позже (поверх)
-            // Умножаем на 10000 для сохранения точности float при конвертации в int
+            float rawSortKey = y - x;
             ZIndex = (int)(-rawSortKey * 10000f);
         }
+
+        private bool IsCrushed()
+        {
+            // 1. Быстрая проверка: если окно сжали меньше габаритов ящика
+            if (CurrentWindow != null)
+            {
+                float cos = Math.Abs((float)Math.Cos(PhysicsBody.Rotation));
+                float sin = Math.Abs((float)Math.Sin(PhysicsBody.Rotation));
+                float boundingWidth = _size * (cos + sin);
+                float boundingHeight = _size * (sin + cos);
+
+                if (CurrentWindow.Width < boundingWidth * 0.85f || CurrentWindow.Height < boundingHeight * 0.85f)
+                {
+                    return true;
+                }
+            }
+
+            // 2. Проверка зажатия между двумя поверхностями (тиски)
+            // Храним пару: (нормаль внутрь ящика, глубина проникновения в метрах)
+            List<(AetherVector normal, float penetration)> contacts = new List<(AetherVector, float)>();
+
+            var contactEdge = PhysicsBody.ContactList;
+            while (contactEdge != null)
+            {
+                var contact = contactEdge.Contact;
+                if (contact != null && contact.IsTouching && contact.Manifold.PointCount > 0)
+                {
+                    contact.GetWorldManifold(out AetherVector normal, out FixedArray2<AetherVector> points);
+
+                    // Нормаль в Aether направлена от FixtureA к FixtureB.
+                    // Нам нужно, чтобы вектор смотрел ВНУТРЬ нашего ящика.
+                    bool isBodyB = contact.FixtureB.Body == PhysicsBody;
+                    AetherVector inwardNormal = isBodyB ? -normal : normal;
+
+                    // Вычисляем реальную глубину вдавливания (penetration) через AABB/проекцию
+                    // или через расстояние точек контакта от центра ящика
+                    float maxPen = 0f;
+                    float halfSize = _size * 0.5f;
+
+                    for (int i = 0; i < contact.Manifold.PointCount; i++)
+                    {
+                        // Переводим мировую точку контакта в локальные координаты ящика
+                        AetherVector localPoint = PhysicsBody.GetLocalPoint(points[i]);
+
+                        // Насколько глубоко точка контакта зашла внутрь квадрата ящика
+                        float penX = halfSize - Math.Abs(localPoint.X);
+                        float penY = halfSize - Math.Abs(localPoint.Y);
+                        float pen = Math.Min(penX, penY);
+
+                        if (pen > maxPen) maxPen = pen;
+                    }
+
+                    contacts.Add((inwardNormal, Math.Max(0f, maxPen)));
+                }
+                contactEdge = contactEdge.Next;
+            }
+
+            if (contacts.Count < 2) return false;
+
+            // Ищем две противоположные силы, которые реально вдавливаются в ящик
+            for (int i = 0; i < contacts.Count; i++)
+            {
+                for (int j = i + 1; j < contacts.Count; j++)
+                {
+                    var n1 = contacts[i].normal;
+                    var n2 = contacts[j].normal;
+                    float dot = n1.X * n2.X + n1.Y * n2.Y;
+
+
+                    if (dot < CrushDotThreshold)
+                    {
+                        float totalPenetration = contacts[i].penetration + contacts[j].penetration;
+                        if (totalPenetration > CrushPenetrationThreshold)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+
+
+
+
+        public void Shatter()
+        {
+            if (IsDestroyed) return;
+
+            if (PhysicsBody != null)
+            {
+                SysVector pos = new SysVector(PhysicsBody.Position.X, PhysicsBody.Position.Y);
+                ParticleSystem.Instance.EmitBoxShatter(pos, _size, CurrentWindow);
+            }
+
+            if (CurrentWindow != null)
+            {
+                CurrentWindow.TeleportOut(this);
+            }
+
+            Destroy();
+        }
+
 
         public override void Draw(RenderEngine renderer, ResourceManager resourceManager)
         {

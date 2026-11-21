@@ -200,9 +200,9 @@ namespace VirtualFriend.Scripts.GameObjects
 
             _localWorld.Step(Math.Min(dt, 1f / 60f));
 
-            foreach (var obj in _microObjects)
+            for (int i = _microObjects.Count - 1; i >= 0; i--)
             {
-                obj.Update(dt);
+                _microObjects[i].Update(dt);
             }
         }
         // Новый сверхбыстрый метод отрисовки с использованием буфера глубины
