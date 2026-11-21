@@ -49,20 +49,22 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.AngularVelocity = angularVelocity;
             PhysicsBody.OnCollision += (sender, other, contact) =>
             {
+                // Считаем относительную скорость удара
                 var relVel = sender.Body.LinearVelocity - other.Body.LinearVelocity;
                 float impactSpeed = relVel.Length();
 
+                // Спавним пыль только если удар достаточно сильный (порог 3.5 м/с)
                 if (impactSpeed > 3.5f && contact.Manifold.PointCount > 0)
                 {
                     contact.GetWorldManifold(out AetherVector normal, out FixedArray2<AetherVector> points);
 
-                    // Направление нормали (убедимся, что она смотрит от поверхности удара к ящику)
-                    bool isBodyB = contact.FixtureB.Body == PhysicsBody;
-                    AetherVector worldNormal = isBodyB ? -normal : normal;
-                    SysVector hitNormal = new SysVector(worldNormal.X, worldNormal.Y);
+                    // В Aether.Physics2D нормаль всегда направлена от FixtureA к FixtureB.
+                    // Нам нужно, чтобы вектор смотрел ОТ препятствия (other) К нашему ящику (sender).
+                    bool isSenderB = contact.FixtureB.Body == sender.Body;
+                    AetherVector outwardNormal = isSenderB ? normal : -normal;
+                    SysVector hitNormal = new SysVector(outwardNormal.X, outwardNormal.Y);
 
                     SysVector pointA = new SysVector(points[0].X, points[0].Y);
-                    // Если точек две (удар ребром) — берем вторую, иначе дублируем первую (удар углом)
                     SysVector pointB = contact.Manifold.PointCount > 1
                         ? new SysVector(points[1].X, points[1].Y)
                         : pointA;
