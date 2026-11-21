@@ -241,7 +241,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
         private bool IsCrushed()
         {
-            // 1. Быстрая проверка: если окно сжали меньше габаритов ящика
+            // 1. Проверка, если окно сжали меньше габаритов ящика (оставляем как есть)
             if (CurrentWindow != null)
             {
                 float cos = Math.Abs((float)Math.Cos(PhysicsBody.Rotation));
@@ -255,9 +255,8 @@ namespace VirtualFriend.Scripts.GameObjects
                 }
             }
 
-            // 2. Проверка зажатия между двумя поверхностями (тиски)
-            // Храним пару: (нормаль внутрь ящика, глубина проникновения в метрах)
-            List<(AetherVector normal, float penetration)> contacts = new List<(AetherVector, float)>();
+            // 2. Проверка тисков по силе давления (NormalImpulse)
+            List<(AetherVector normal, float impulse)> contacts = new List<(AetherVector, float)>();
 
             var contactEdge = PhysicsBody.ContactList;
             while (contactEdge != null)
@@ -265,39 +264,28 @@ namespace VirtualFriend.Scripts.GameObjects
                 var contact = contactEdge.Contact;
                 if (contact != null && contact.IsTouching && contact.Manifold.PointCount > 0)
                 {
-                    contact.GetWorldManifold(out AetherVector normal, out FixedArray2<AetherVector> points);
+                    contact.GetWorldManifold(out AetherVector normal, out _);
 
-                    // Нормаль в Aether направлена от FixtureA к FixtureB.
-                    // Нам нужно, чтобы вектор смотрел ВНУТРЬ нашего ящика.
                     bool isBodyB = contact.FixtureB.Body == PhysicsBody;
                     AetherVector inwardNormal = isBodyB ? -normal : normal;
 
-                    // Вычисляем реальную глубину вдавливания (penetration) через AABB/проекцию
-                    // или через расстояние точек контакта от центра ящика
-                    float maxPen = 0f;
-                    float halfSize = _size * 0.5f;
-
+                    // Суммируем нормальный импульс по всем точкам этого контакта (1 или 2 точки)
+                    float totalNormalImpulse = 0f;
                     for (int i = 0; i < contact.Manifold.PointCount; i++)
                     {
-                        // Переводим мировую точку контакта в локальные координаты ящика
-                        AetherVector localPoint = PhysicsBody.GetLocalPoint(points[i]);
-
-                        // Насколько глубоко точка контакта зашла внутрь квадрата ящика
-                        float penX = halfSize - Math.Abs(localPoint.X);
-                        float penY = halfSize - Math.Abs(localPoint.Y);
-                        float pen = Math.Min(penX, penY);
-
-                        if (pen > maxPen) maxPen = pen;
+                        totalNormalImpulse += contact.Manifold.Points[i].NormalImpulse;
                     }
 
-                    contacts.Add((inwardNormal, Math.Max(0f, maxPen)));
+                    contacts.Add((inwardNormal, totalNormalImpulse));
                 }
                 contactEdge = contactEdge.Next;
             }
 
             if (contacts.Count < 2) return false;
 
-            // Ищем две противоположные силы, которые реально вдавливаются в ящик
+            // Порог импульса сжатия (зависит от массы ящика, для _size = 1.0 и плотности 2.0 вес ~ 1.5 - 2.0)
+            float crushImpulseThreshold = 15f * (_size * _size);
+
             for (int i = 0; i < contacts.Count; i++)
             {
                 for (int j = i + 1; j < contacts.Count; j++)
@@ -306,11 +294,12 @@ namespace VirtualFriend.Scripts.GameObjects
                     var n2 = contacts[j].normal;
                     float dot = n1.X * n2.X + n1.Y * n2.Y;
 
-
+                    // Если силы направлены друг против друга
                     if (dot < CrushDotThreshold)
                     {
-                        float totalPenetration = contacts[i].penetration + contacts[j].penetration;
-                        if (totalPenetration > CrushPenetrationThreshold)
+                        // Берем минимальный из двух встречных импульсов — это и есть сила сжатия в тисках
+                        float squeezeForce = Math.Min(contacts[i].impulse, contacts[j].impulse);
+                        if (squeezeForce > crushImpulseThreshold)
                         {
                             return true;
                         }
@@ -320,6 +309,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
             return false;
         }
+
 
 
 
