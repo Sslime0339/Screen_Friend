@@ -6,8 +6,7 @@
 
 
 
-using Genbox.VelcroPhysics.Dynamics;
-using Genbox.VelcroPhysics.Factories;
+
 using Raylib_cs;
 using System.Diagnostics;
 using VirtualFriend.Scripts;
@@ -17,8 +16,12 @@ using VirtualFriend.Scripts.Interfaces;
 using VirtualFriend.Views;
 using static VirtualFriend.Scripts.Win32Native;
 using SysVector = System.Numerics.Vector2;
-using XnaVector = Microsoft.Xna.Framework.Vector2;
 
+
+using nkast.Aether.Physics2D.Dynamics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Collision.Shapes;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
 
 
 
@@ -163,7 +166,7 @@ namespace VirtualFriend
             _resourceManager.LoadFont(Assets.Fonts.MainFont, "Assets/Fonts/arial.ttf");
 
 
-            _physicsSystem = new PhysicsSystem(new Microsoft.Xna.Framework.Vector2(0f, 19.6f)); // Гравитация
+            _physicsSystem = new PhysicsSystem(new AetherVector(0f, 19.6f)); // Гравитация
             _renderEngine = new RenderEngine(ppm, _resourceManager);
             InitWalls(ppm);
 
@@ -416,7 +419,7 @@ namespace VirtualFriend
                 SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
                 BoxObject giantBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, 3.0f);
                 _desktopGameObjects.Add(giantBox);
-                HandleObjectTeleportation(giantBox, mouseWorldPos, new XnaVector(0, 0));
+                HandleObjectTeleportation(giantBox, mouseWorldPos, new AetherVector(0, 0));
             }
 
             // --- 2. Очистка сцены (Клавиша X) ---
@@ -441,7 +444,7 @@ namespace VirtualFriend
 
             // --- 3. ХВАТАНИЕ И ПЕРЕТАСКИВАНИЕ (Через интерфейсы) ---
             SysVector currentMouseWorld = _inputManager.GetMouseWorldPosition();
-            XnaVector currentMouseWorldXna = new XnaVector(currentMouseWorld.X, currentMouseWorld.Y);
+            AetherVector currentMouseWorldXna = new AetherVector(currentMouseWorld.X, currentMouseWorld.Y);
 
             if (_draggedObject != null && _draggedObject is GameObject dragObj && dragObj.IsDestroyed) _draggedObject = null;
 
@@ -472,7 +475,7 @@ namespace VirtualFriend
             {
 
                 float launchModifier = 1.0f;
-                XnaVector releaseVelocity = new XnaVector(
+                AetherVector releaseVelocity = new AetherVector(
                     _inputManager.MouseWorldVelocity.X * launchModifier,
                     _inputManager.MouseWorldVelocity.Y * launchModifier
                 );
@@ -543,12 +546,12 @@ namespace VirtualFriend
 
             BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
             _desktopGameObjects.Add(newBox);
-            HandleObjectTeleportation(newBox, mouseWorldPos, new XnaVector(0, 0));
+            HandleObjectTeleportation(newBox, mouseWorldPos, new AetherVector(0, 0));
         }
 
 
 
-        private static void HandleObjectTeleportation(GameObject obj, SysVector currentMouseWorld, XnaVector releaseVelocity)
+        private static void HandleObjectTeleportation(GameObject obj, SysVector currentMouseWorld, AetherVector releaseVelocity)
         {
             if (obj is ITeleportable teleportableObj)
             {
@@ -595,7 +598,6 @@ namespace VirtualFriend
 
 
 
-
         private static void InitWalls(float PixelsPerMeter)
         {
             World _world = _physicsSystem.World;
@@ -614,37 +616,42 @@ namespace VirtualFriend
 
 
             // Нижний пол
-            Body ground = BodyFactory.CreateRectangle(
-                _world,
-                groundWidthMeters * 1.2f, groundHeightMeters,
+            Body ground = _world.CreateRectangle(
+                groundWidthMeters * 1.2f,
+                groundHeightMeters,
                 1f,
-                new XnaVector(groundWidthMeters / 2f, groundYMeters)
+                new AetherVector(groundWidthMeters / 2f, groundYMeters),
+                0f,
+                BodyType.Static
             );
-            ground.BodyType = BodyType.Static;
-            ground.Friction = 0.6f;
+            ground.FixtureList[0].Friction = 0.6f;
 
             // Левая стена
-            Body leftWall = BodyFactory.CreateRectangle(
-                _world,
-                wallThickness, viewHeightMeters * 8,
+            Body leftWall = _world.CreateRectangle(
+                wallThickness,
+                viewHeightMeters * 8,
                 1f,
-                new XnaVector(-(wallThickness / 2f), viewHeightMeters / 2f)
+                new AetherVector(-(wallThickness / 2f), viewHeightMeters / 2f),
+                0f,
+                BodyType.Static
             );
-            leftWall.BodyType = BodyType.Static;
-            leftWall.Friction = 0.4f;
-            leftWall.Restitution = 0.3f;
+            leftWall.FixtureList[0].Friction = 0.4f;
+            leftWall.FixtureList[0].Restitution = 0.3f;
 
             // Правая стена
-            Body rightWall = BodyFactory.CreateRectangle(
-                _world,
-                wallThickness, viewHeightMeters * 8,
+            Body rightWall = _world.CreateRectangle(
+                wallThickness,
+                viewHeightMeters * 8,
                 1f,
-                new XnaVector(viewWidthMeters + (wallThickness / 2f), viewHeightMeters / 2f)
+                new AetherVector(viewWidthMeters + (wallThickness / 2f), viewHeightMeters / 2f),
+                0f,
+                BodyType.Static
             );
-            rightWall.BodyType = BodyType.Static;
-            rightWall.Friction = 0.4f;
-            rightWall.Restitution = 0.3f;
+            rightWall.FixtureList[0].Friction = 0.4f;
+            rightWall.FixtureList[0].Restitution = 0.3f;
+
         }
+
 
         private static WindowZoneObject GetTopWindowUnderMouse(SysVector mouseWorldPos)
         {
@@ -689,7 +696,7 @@ namespace VirtualFriend
 
                 // Получаем текущие параметры объекта в метрах физического мира
                 SysVector currentPos = new SysVector(obj.PhysicsBody.Position.X, obj.PhysicsBody.Position.Y);
-                XnaVector currentVelocity = obj.PhysicsBody.LinearVelocity;
+                AetherVector currentVelocity = obj.PhysicsBody.LinearVelocity;
 
                 // Временно отвязываем от текущего свернутого окна, чтобы HandleObjectTeleportation посчитал его свободным
                 //minimizedWindow.TeleportOut(obj);
@@ -712,7 +719,7 @@ namespace VirtualFriend
                 if (obj is WindowZoneObject || obj.PhysicsBody == null) continue;
 
                 SysVector currentPos = new SysVector(obj.PhysicsBody.Position.X, obj.PhysicsBody.Position.Y);
-                XnaVector currentVelocity = obj.PhysicsBody.LinearVelocity;
+                AetherVector currentVelocity = obj.PhysicsBody.LinearVelocity;
 
                 // Удаляем с рабочего стола
                 _desktopGameObjects.Remove(obj);

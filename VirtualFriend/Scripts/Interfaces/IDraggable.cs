@@ -2,8 +2,14 @@
 using System.Collections.Generic;
 using System.Text;
 
-using Microsoft.Xna.Framework;
-using Genbox.VelcroPhysics.Dynamics;
+
+
+
+using nkast.Aether.Physics2D.Dynamics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Collision.Shapes;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+
 
 
 namespace VirtualFriend.Scripts.Interfaces
@@ -18,9 +24,9 @@ namespace VirtualFriend.Scripts.Interfaces
         void OnDragStart();
 
         // Метод самого процесса удержания мыши
-        void OnDrag(Vector2 targetWorldPos, float responsiveness, float scrollDelta, float dt);
+        void OnDrag(AetherVector targetWorldPos, float responsiveness, float scrollDelta, float dt);
 
         // Метод броска объекта (отпускание мыши)
-        void OnDragEnd(Vector2 releaseVelocity);
+        void OnDragEnd(AetherVector releaseVelocity);
     }
 }

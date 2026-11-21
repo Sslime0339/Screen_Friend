@@ -1,5 +1,13 @@
-﻿using Genbox.VelcroPhysics.Dynamics;
+﻿
+
 using Raylib_cs;
+
+
+using nkast.Aether.Physics2D.Dynamics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Collision.Shapes;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+
 
 
 
@@ -26,9 +34,10 @@ namespace VirtualFriend.Scripts.GameObjects
             IsDestroyed = true;
             if (PhysicsBody != null)
             {
-                PhysicsBody.RemoveFromWorld();
+                PhysicsBody.World?.Remove(PhysicsBody);
                 PhysicsBody = null;
             }
         }
+
     }
 }

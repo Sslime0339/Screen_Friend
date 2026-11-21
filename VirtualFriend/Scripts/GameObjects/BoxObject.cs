@@ -1,9 +1,18 @@
-﻿using Genbox.VelcroPhysics.Dynamics;
-using Genbox.VelcroPhysics.Factories;
+﻿
+
 using Raylib_cs;
 using VirtualFriend.Scripts.Interfaces;
 using SysVector = System.Numerics.Vector2;
-using XnaVector = Microsoft.Xna.Framework.Vector2;
+
+
+
+using nkast.Aether.Physics2D.Dynamics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Collision.Shapes;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+
+
+
 
 namespace VirtualFriend.Scripts.GameObjects
 {
@@ -26,25 +35,28 @@ namespace VirtualFriend.Scripts.GameObjects
         // Выносим создание тела в отдельный приватный метод для удобства переиспользования
         private void CreatePhysics(World world, SysVector pos, float rotation = 0, float angularVelocity = 0)
         {
-            PhysicsBody = BodyFactory.CreateRectangle(world, _size, _size, 2f, new XnaVector(pos.X, pos.Y));
-            PhysicsBody.BodyType = BodyType.Dynamic;
-            PhysicsBody.Restitution = 0.2f;
-            PhysicsBody.Friction = 0.6f;
+
+            PhysicsBody = world.CreateRectangle(_size, _size, 2f, new AetherVector(pos.X, pos.Y), rotation, BodyType.Dynamic);
+            PhysicsBody.BodyType = BodyType.Dynamic; 
+            PhysicsBody.FixtureList[0].Restitution = 0.2f;
+            PhysicsBody.FixtureList[0].Friction = 0.6f;
             PhysicsBody.Rotation = rotation;
             PhysicsBody.AngularVelocity = angularVelocity;
         }
 
         // Реализация метода телепортации
-        public void TeleportToWorld(World targetWorld, SysVector position, XnaVector velocity)
+        public void TeleportToWorld(World targetWorld, SysVector position, AetherVector velocity)
         {
-            float rotation = PhysicsBody.Rotation;
-            float angularVelocity = PhysicsBody.AngularVelocity;
+            float rotation = PhysicsBody != null ? PhysicsBody.Rotation : 0f;
+            float angularVelocity = PhysicsBody != null ? PhysicsBody.AngularVelocity : 0f;
+
             // 1. Если у объекта уже есть тело в каком-то мире — удаляем его
             if (PhysicsBody != null)
             {
-                PhysicsBody.RemoveFromWorld();
+                PhysicsBody.World?.Remove(PhysicsBody);
                 PhysicsBody = null;
             }
+
             // 2. Создаем точно такое же тело, но уже в новом targetWorld
             CreatePhysics(targetWorld, position, rotation, angularVelocity);
 
@@ -54,6 +66,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 PhysicsBody.LinearVelocity = velocity;
             }
         }
+
 
         // --- Реализация интерфейса IClickable ---
 
@@ -96,7 +109,7 @@ namespace VirtualFriend.Scripts.GameObjects
             if (PhysicsBody == null) return;
 
             // Подбрасываем коробку вверх и слегка закручиваем
-            PhysicsBody.LinearVelocity = new XnaVector(PhysicsBody.LinearVelocity.X, -8f);
+            PhysicsBody.LinearVelocity = new AetherVector(PhysicsBody.LinearVelocity.X, -8f);
             PhysicsBody.AngularVelocity = (Random.Shared.NextSingle() - 0.5f) * 10f;
         }
 
@@ -122,14 +135,14 @@ namespace VirtualFriend.Scripts.GameObjects
         {
             if (PhysicsBody == null) return;
             // Обнуляем старые скорости, чтобы коробка мгновенно перешла под контроль
-            PhysicsBody.LinearVelocity = XnaVector.Zero;
+            PhysicsBody.LinearVelocity = AetherVector.Zero;
             PhysicsBody.AngularVelocity = 0f;
 
             // ЭФФЕКТ: Приподнимаем коробку над остальными во время перетаскивания
             // Layer = DrawLayer.Characters;
         }
 
-        public void OnDrag(XnaVector targetWorldPos, float responsiveness, float scrollDelta, float dt)
+        public void OnDrag(AetherVector targetWorldPos, float responsiveness, float scrollDelta, float dt)
         {
             if (PhysicsBody == null) return;
 
@@ -140,7 +153,7 @@ namespace VirtualFriend.Scripts.GameObjects
             float targetY = targetWorldPos.Y - PhysicsBody.Position.Y;
 
             // Притягиваем ящик к курсору
-            PhysicsBody.LinearVelocity = new XnaVector(
+            PhysicsBody.LinearVelocity = new AetherVector(
                 targetX * responsiveness,
                 targetY * responsiveness
             );
@@ -169,7 +182,7 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.AngularVelocity = (angleError * factor) / dt;
         }
 
-        public void OnDragEnd(XnaVector releaseVelocity)
+        public void OnDragEnd(AetherVector releaseVelocity)
         {
             if (PhysicsBody == null) return;
             // Передаем финальное ускорение от броска руки

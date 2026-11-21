@@ -1,11 +1,19 @@
-﻿using Genbox.VelcroPhysics.Dynamics;
-using Genbox.VelcroPhysics.Factories;
+﻿
+
 using Raylib_cs;
 using System;
 using System.Collections.Generic;
 using VirtualFriend.Scripts.Interfaces;
 using SysVector = System.Numerics.Vector2;
-using XnaVector = Microsoft.Xna.Framework.Vector2;
+
+
+
+using nkast.Aether.Physics2D.Dynamics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Collision.Shapes;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+
+
 
 namespace VirtualFriend.Scripts.GameObjects
 {
@@ -39,6 +47,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
         public WindowZoneObject(World world, WindowManager.WindowData data, float ppm)
         {
+            IsShow = true;
             Hwnd = data.Hwnd;
             Width = data.Width;
             Height = data.Height;
@@ -47,7 +56,7 @@ namespace VirtualFriend.Scripts.GameObjects
             _ppm = ppm;
             _bodyWorld = world;
 
-            _localWorld = new World(new Microsoft.Xna.Framework.Vector2(0f, 19.6f));
+            _localWorld = new World(new AetherVector(0f, 19.6f));
 
             CreateOuterBody(world);
             BuildInnerBoundaries(_localWorld);
@@ -55,8 +64,8 @@ namespace VirtualFriend.Scripts.GameObjects
 
             this.Layer = DrawLayer.Background;
 
-        }
 
+        }
 
         private void CreateOuterBody(World world)
         {
@@ -65,8 +74,8 @@ namespace VirtualFriend.Scripts.GameObjects
                 Console.WriteLine("Тело уже есть");
                 return;
             }
-            PhysicsBody = BodyFactory.CreateRectangle(world, Width, Height, 1f, new XnaVector(Center.X, Center.Y));
-            PhysicsBody.BodyType = BodyType.Kinematic;
+
+            PhysicsBody = world.CreateRectangle(Width, Height, 1f, new AetherVector(Center.X, Center.Y), 0f, BodyType.Kinematic);
         }
 
         private void DeleteOuterBody()
@@ -76,11 +85,13 @@ namespace VirtualFriend.Scripts.GameObjects
                 Console.WriteLine("Тело нет");
                 return;
             }
-            PhysicsBody.RemoveFromWorld();
+
+            _bodyWorld.Remove(PhysicsBody);
             PhysicsBody = null;
         }
 
-        
+
+
 
         public void UpdatePositionAndSize(WindowManager.WindowData data, float dt) // <-- ДОБАВЛЕН dt ПАРАМЕТР
         {
@@ -100,7 +111,7 @@ namespace VirtualFriend.Scripts.GameObjects
 
             if (PhysicsBody != null)
             {
-                PhysicsSystem.MoveKinematicBody(PhysicsBody, new XnaVector(Center.X, Center.Y), dt, force);
+                PhysicsSystem.MoveKinematicBody(PhysicsBody, new AetherVector(Center.X, Center.Y), dt, force);
                 //cPhysicsBody.Position = new XnaVector(Center.X, Center.Y);
             }
 
@@ -108,10 +119,10 @@ namespace VirtualFriend.Scripts.GameObjects
             // мы вычисляем их новые целевые позиции и двигаем через физику!
             if (_innerWalls.Count == 4)
             {
-                XnaVector targetFloor = new XnaVector(Center.X, Center.Y + Height / 2f + WallThickness / 2);
-                XnaVector targetCeiling = new XnaVector(Center.X, Center.Y - Height / 2f - WallThickness / 2);
-                XnaVector targetLeft = new XnaVector(Center.X - Width / 2f - WallThickness / 2, Center.Y);
-                XnaVector targetRight = new XnaVector(Center.X + Width / 2f + WallThickness / 2, Center.Y);
+                AetherVector targetFloor = new AetherVector(Center.X, Center.Y + Height / 2f + WallThickness / 2);
+                AetherVector targetCeiling = new AetherVector(Center.X, Center.Y - Height / 2f - WallThickness / 2);
+                AetherVector targetLeft = new AetherVector(Center.X - Width / 2f - WallThickness / 2, Center.Y);
+                AetherVector targetRight = new AetherVector(Center.X + Width / 2f + WallThickness / 2, Center.Y);
 
                 PhysicsSystem.MoveKinematicBody(_innerWalls[0], targetFloor, dt, force);
                 PhysicsSystem.MoveKinematicBody(_innerWalls[1], targetCeiling, dt, force);
@@ -123,22 +134,16 @@ namespace VirtualFriend.Scripts.GameObjects
 
         private void BuildInnerBoundaries(World world)
         {
-
-            // Каждая из стен теперь создается изначально, но мы настраиваем тип на Kinematic
-            var floor = BodyFactory.CreateRectangle(world, Width * 2, WallThickness, 1f, new XnaVector(Center.X, Center.Y + Height / 2f + WallThickness / 2));
-            floor.BodyType = BodyType.Kinematic;
+            var floor = world.CreateRectangle(Width * 2, WallThickness, 1f, new AetherVector(Center.X, Center.Y + Height / 2f + WallThickness / 2), 0f, BodyType.Kinematic);
             _innerWalls.Add(floor);
 
-            var ceiling = BodyFactory.CreateRectangle(world, Width * 2, WallThickness, 1f, new XnaVector(Center.X, Center.Y - Height / 2f - WallThickness / 2));
-            ceiling.BodyType = BodyType.Kinematic;
+            var ceiling = world.CreateRectangle(Width * 2, WallThickness, 1f, new AetherVector(Center.X, Center.Y - Height / 2f - WallThickness / 2), 0f, BodyType.Kinematic);
             _innerWalls.Add(ceiling);
 
-            var leftWall = BodyFactory.CreateRectangle(world, WallThickness, Height * 2, 1f, new XnaVector(Center.X - Width / 2f - WallThickness / 2, Center.Y));
-            leftWall.BodyType = BodyType.Kinematic;
+            var leftWall = world.CreateRectangle(WallThickness, Height * 2, 1f, new AetherVector(Center.X - Width / 2f - WallThickness / 2, Center.Y), 0f, BodyType.Kinematic);
             _innerWalls.Add(leftWall);
 
-            var rightWall = BodyFactory.CreateRectangle(world, WallThickness, Height * 2, 1f, new XnaVector(Center.X + Width / 2f + WallThickness / 2, Center.Y));
-            rightWall.BodyType = BodyType.Kinematic;
+            var rightWall = world.CreateRectangle(WallThickness, Height * 2, 1f, new AetherVector(Center.X + Width / 2f + WallThickness / 2, Center.Y), 0f, BodyType.Kinematic);
             _innerWalls.Add(rightWall);
         }
 
@@ -146,10 +151,11 @@ namespace VirtualFriend.Scripts.GameObjects
         {
             foreach (var wall in _innerWalls)
             {
-                world.DestroyBody(wall);
+                world.Remove(wall);
             }
             _innerWalls.Clear();
         }
+
 
         private void SpawnMicroWorldContents(World world)
         {
@@ -165,7 +171,7 @@ namespace VirtualFriend.Scripts.GameObjects
         }
 
 
-        public void TeleportIn(GameObject obj, SysVector worldPos, XnaVector velocity)
+        public void TeleportIn(GameObject obj, SysVector worldPos, AetherVector velocity)
         {
             if (obj is ITeleportable teleportableObj)
             {
@@ -291,8 +297,8 @@ namespace VirtualFriend.Scripts.GameObjects
                 if (wall.FixtureList == null || wall.FixtureList.Count == 0)
                     continue;
 
-                // В VelcroPhysics прямоугольники, созданные через BodyFactory.CreateRectangle, являются PolygonShape
-                if (wall.FixtureList[0].Shape is Genbox.VelcroPhysics.Collision.Shapes.PolygonShape polygonShape)
+
+                if (wall.FixtureList[0].Shape is nkast.Aether.Physics2D.Collision.Shapes.PolygonShape polygonShape)
                 {
                     // Получаем локальные вершины полигона
                     var vertices = polygonShape.Vertices;
