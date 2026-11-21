@@ -164,5 +164,41 @@ namespace VirtualFriend.Scripts
                 (byte)(a.A + (b.A - a.A) * t)
             );
         }
+
+        public void EmitImpactDust(SysVector pointA, SysVector pointB, SysVector normal, float intensity, WindowZoneObject? window)
+        {
+            int count = Math.Clamp((int)(intensity * 1.5f), 3, 12);
+
+            for (int i = 0; i < count; i++)
+            {
+                // Случайная позиция вдоль всего ребра контакта (от 0.0 до 1.0)
+                float lerpFactor = Random.Shared.NextSingle();
+                SysVector spawnPos = SysVector.Lerp(pointA, pointB, lerpFactor);
+
+                float spread = (Random.Shared.NextSingle() - 0.5f) * 3.0f;
+                SysVector tangent = new SysVector(-normal.Y, normal.X);
+                SysVector vel = (normal * (Random.Shared.NextSingle() * 1.5f + 0.5f)) + (tangent * spread * intensity * 0.4f);
+
+                float life = 0.25f + Random.Shared.NextSingle() * 0.2f;
+                float size = 0.08f + Random.Shared.NextSingle() * 0.08f;
+
+                Spawn(new Particle
+                {
+                    Position = spawnPos + normal * 0.05f, // Используем spawnPos вместо одиночной position
+                    Velocity = vel,
+                    Gravity = -1.5f,
+                    Drag = 0.08f,
+                    Rotation = Random.Shared.NextSingle() * 360f,
+                    AngularVelocity = (Random.Shared.NextSingle() - 0.5f) * 180f,
+                    StartSize = size,
+                    EndSize = size * 1.8f,
+                    StartColor = new Color(220, 220, 220, 180),
+                    EndColor = new Color(220, 220, 220, 0),
+                    LifeTime = life,
+                    MaxLifeTime = life,
+                    OwnerWindow = window
+                });
+            }
+        }
     }
 }

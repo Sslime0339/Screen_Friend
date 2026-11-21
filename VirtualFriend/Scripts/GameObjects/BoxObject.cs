@@ -47,24 +47,31 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.FixtureList[0].Friction = 0.6f;
             PhysicsBody.Rotation = rotation;
             PhysicsBody.AngularVelocity = angularVelocity;
-
             PhysicsBody.OnCollision += (sender, other, contact) =>
             {
-                // Считаем относительную скорость удара
                 var relVel = sender.Body.LinearVelocity - other.Body.LinearVelocity;
                 float impactSpeed = relVel.Length();
 
-                // Спавним пыль только если удар достаточно сильный (порог 3.5 м/с)
-                if (impactSpeed > 3.5f)
+                if (impactSpeed > 3.5f && contact.Manifold.PointCount > 0)
                 {
                     contact.GetWorldManifold(out AetherVector normal, out FixedArray2<AetherVector> points);
-                    SysVector hitPoint = new SysVector(points[0].X, points[0].Y);
-                    SysVector hitNormal = new SysVector(normal.X, normal.Y);
 
-                    ParticleSystem.Instance.EmitImpactDust(hitPoint, hitNormal, impactSpeed * 0.5f, CurrentWindow);
+                    // Направление нормали (убедимся, что она смотрит от поверхности удара к ящику)
+                    bool isBodyB = contact.FixtureB.Body == PhysicsBody;
+                    AetherVector worldNormal = isBodyB ? -normal : normal;
+                    SysVector hitNormal = new SysVector(worldNormal.X, worldNormal.Y);
+
+                    SysVector pointA = new SysVector(points[0].X, points[0].Y);
+                    // Если точек две (удар ребром) — берем вторую, иначе дублируем первую (удар углом)
+                    SysVector pointB = contact.Manifold.PointCount > 1
+                        ? new SysVector(points[1].X, points[1].Y)
+                        : pointA;
+
+                    ParticleSystem.Instance.EmitImpactDust(pointA, pointB, hitNormal, impactSpeed * 0.5f, CurrentWindow);
                 }
                 return true;
             };
+
 
         }
 
