@@ -239,7 +239,7 @@ namespace VirtualFriend.Scripts.GameObjects
                 thisScreenY = (Center.Y * _ppm) - (thisScreenH / 2f);
             }
             // 1. РИСУЕМ ОБЪЕКТЫ ВНУТРИ ОКНА
-            if (_microObjects.Count > 0)
+            //if (_microObjects.Count > 0)
             {
                 _microObjects.Sort((a, b) =>
                 {
@@ -259,6 +259,10 @@ namespace VirtualFriend.Scripts.GameObjects
                 {
                     obj.Draw(renderer, resourceManager);
                 }
+
+
+                ParticleSystem.Instance.DrawForWindow(renderer, this);
+
 
                 Rlgl.DrawRenderBatchActive();
                 Rlgl.PopMatrix();

@@ -42,6 +42,25 @@ namespace VirtualFriend.Scripts.GameObjects
             PhysicsBody.FixtureList[0].Friction = 0.6f;
             PhysicsBody.Rotation = rotation;
             PhysicsBody.AngularVelocity = angularVelocity;
+
+            PhysicsBody.OnCollision += (sender, other, contact) =>
+            {
+                // Считаем относительную скорость удара
+                var relVel = sender.Body.LinearVelocity - other.Body.LinearVelocity;
+                float impactSpeed = relVel.Length();
+
+                // Спавним пыль только если удар достаточно сильный (порог 3.5 м/с)
+                if (impactSpeed > 3.5f)
+                {
+                    contact.GetWorldManifold(out AetherVector normal, out FixedArray2<AetherVector> points);
+                    SysVector hitPoint = new SysVector(points[0].X, points[0].Y);
+                    SysVector hitNormal = new SysVector(normal.X, normal.Y);
+
+                    ParticleSystem.Instance.EmitImpactDust(hitPoint, hitNormal, impactSpeed * 0.5f, CurrentWindow);
+                }
+                return true;
+            };
+
         }
 
         // Реализация метода телепортации
@@ -116,6 +135,14 @@ namespace VirtualFriend.Scripts.GameObjects
         public void OnMiddleClick()
         {
             if (IsDestroyed) return;
+
+
+            if (PhysicsBody != null)
+            {
+                SysVector pos = new SysVector(PhysicsBody.Position.X, PhysicsBody.Position.Y);
+                ParticleSystem.Instance.EmitBoxShatter(pos, _size, CurrentWindow);
+            }
+
 
             // Если коробка внутри окна — корректно вытаскиваем её из списка окна перед удалением
             if (CurrentWindow != null)

@@ -230,6 +230,11 @@ namespace VirtualFriend
                 _physicsSystem.Step(dt);
 
 
+
+                ParticleSystem.Instance.Update(dt);
+
+
+
                 // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
                 _desktopGameObjects.Sort((a, b) =>
                 {
@@ -293,6 +298,12 @@ namespace VirtualFriend
                         obj.Draw(_renderEngine, _resourceManager);
                     }
                 }
+
+
+
+                ParticleSystem.Instance.DrawForWindow(_renderEngine, null);
+
+
 
                 Rlgl.DrawRenderBatchActive();
                 Rlgl.PopMatrix();
