@@ -1,5 +1,4 @@
-﻿
-namespace VirtualFriend.Scripts
+﻿namespace VirtualFriend.Systems
 {
     internal enum KeyCode : int
     {

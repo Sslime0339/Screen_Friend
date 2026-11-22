@@ -1,11 +1,14 @@
 ﻿using Raylib_cs;
 using System;
 using System.Collections.Generic;
-using VirtualFriend.Scripts.GameObjects;
-using VirtualFriend.Scripts.Interfaces;
+using VirtualFriend.Core;
+using VirtualFriend.Entities;
+using VirtualFriend.Entities.Objects;
+using VirtualFriend.Graphics;
+using VirtualFriend.Interfaces;
 using SysVector = System.Numerics.Vector2;
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Systems
 {
     internal class InputManager
     {

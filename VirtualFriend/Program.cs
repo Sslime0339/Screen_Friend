@@ -9,12 +9,9 @@
 
 using Raylib_cs;
 using System.Diagnostics;
-using VirtualFriend.Scripts;
 // подключаем другие прстранства имён
-using VirtualFriend.Scripts.GameObjects;
-using VirtualFriend.Scripts.Interfaces;
 using VirtualFriend.Views;
-using static VirtualFriend.Scripts.Win32Native;
+using static VirtualFriend.Core.Win32Native;
 using SysVector = System.Numerics.Vector2;
 
 
@@ -22,6 +19,11 @@ using nkast.Aether.Physics2D.Dynamics;
 using nkast.Aether.Physics2D.Common;
 using nkast.Aether.Physics2D.Collision.Shapes;
 using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+using VirtualFriend.Systems;
+using VirtualFriend.Graphics;
+using VirtualFriend.Entities;
+using VirtualFriend.Entities.Objects;
+using VirtualFriend.Interfaces;
 
 
 

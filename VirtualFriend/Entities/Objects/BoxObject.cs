@@ -1,7 +1,6 @@
 ﻿
 
 using Raylib_cs;
-using VirtualFriend.Scripts.Interfaces;
 using SysVector = System.Numerics.Vector2;
 
 
@@ -10,11 +9,12 @@ using nkast.Aether.Physics2D.Dynamics;
 using nkast.Aether.Physics2D.Common;
 using nkast.Aether.Physics2D.Collision.Shapes;
 using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+using VirtualFriend.Systems;
+using VirtualFriend.Graphics;
+using VirtualFriend.Entities;
+using VirtualFriend.Interfaces;
 
-
-
-
-namespace VirtualFriend.Scripts.GameObjects
+namespace VirtualFriend.Entities.Objects
 {
     // Добавили наследование интерфейса IDraggable
     internal class BoxObject : GameObject, IDraggable, ITeleportable

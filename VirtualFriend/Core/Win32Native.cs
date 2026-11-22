@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Core
 {
     internal static class Win32Native
     {

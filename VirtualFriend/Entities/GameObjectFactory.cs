@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-
-using VirtualFriend.Scripts.GameObjects;
 using SysVector = System.Numerics.Vector2;
 
 
@@ -9,11 +7,13 @@ using nkast.Aether.Physics2D.Dynamics;
 using nkast.Aether.Physics2D.Common;
 using nkast.Aether.Physics2D.Collision.Shapes;
 using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+using VirtualFriend.Systems;
+using VirtualFriend.Entities.Objects;
 
 
 
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Entities
 {
 
     internal class GameObjectFactory

@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using VirtualFriend.Scripts.GameObjects;
+using VirtualFriend.Entities.Objects;
 
-namespace VirtualFriend.Scripts.Interfaces
+namespace VirtualFriend.Interfaces
 {
     internal interface IClickable
     {

@@ -1,9 +1,10 @@
 ﻿using Raylib_cs;
 using System;
-using VirtualFriend.Scripts.GameObjects;
+using VirtualFriend.Entities.Objects;
+using VirtualFriend.Graphics;
 using SysVector = System.Numerics.Vector2;
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Systems
 {
     internal struct Particle
     {

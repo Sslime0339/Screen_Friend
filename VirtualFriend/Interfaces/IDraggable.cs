@@ -12,7 +12,7 @@ using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
 
 
 
-namespace VirtualFriend.Scripts.Interfaces
+namespace VirtualFriend.Interfaces
 {
     // Наследуемся от IClickable, так как перетаскивание всегда начинается с клика
     internal interface IDraggable : IClickable

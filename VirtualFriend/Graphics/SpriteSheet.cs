@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Graphics
 {
 
 

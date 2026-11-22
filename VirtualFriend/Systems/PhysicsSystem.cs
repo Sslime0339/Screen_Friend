@@ -5,7 +5,7 @@ using nkast.Aether.Physics2D.Common;
 using nkast.Aether.Physics2D.Collision.Shapes;
 using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Systems
 {
     internal class PhysicsSystem
     {

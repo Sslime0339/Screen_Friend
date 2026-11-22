@@ -7,11 +7,10 @@ using nkast.Aether.Physics2D.Dynamics;
 using nkast.Aether.Physics2D.Common;
 using nkast.Aether.Physics2D.Collision.Shapes;
 using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+using VirtualFriend.Graphics;
+using VirtualFriend.Entities.Objects;
 
-
-
-
-namespace VirtualFriend.Scripts.GameObjects
+namespace VirtualFriend.Entities
 {
     internal abstract class GameObject
     {
