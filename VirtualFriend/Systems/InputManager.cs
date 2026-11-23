@@ -40,7 +40,7 @@ namespace VirtualFriend.Systems
             ResetMousePosition();
         }
 
-        public void Update(List<GameObject> gameObjects, float dt, WindowZoneObject WinUnderMouse)
+        public void Update(IReadOnlyList<GameObject> gameObjects, float dt, WindowZoneObject WinUnderMouse)
         {
             // 1. Обновляем состояние всех клавиш клавиатуры и кнопок мыши
             UpdateKeyboardState(dt);

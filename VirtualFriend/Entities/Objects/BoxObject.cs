@@ -325,10 +325,7 @@ namespace VirtualFriend.Entities.Objects
                 ParticleSystem.Instance.EmitBoxShatter(pos, _size, CurrentWindow);
             }
 
-            if (CurrentWindow != null)
-            {
-                CurrentWindow.TeleportOut(this);
-            }
+            CurrentContainer?.RemoveObject(this);
 
             Destroy();
         }

@@ -1,14 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using SysVector = System.Numerics.Vector2;
-
-
-using nkast.Aether.Physics2D.Dynamics;
+﻿using nkast.Aether.Physics2D.Collision.Shapes;
 using nkast.Aether.Physics2D.Common;
-using nkast.Aether.Physics2D.Collision.Shapes;
-using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
-using VirtualFriend.Systems;
+using nkast.Aether.Physics2D.Dynamics;
+using System;
+using System.Collections.Generic;
+
 using VirtualFriend.Entities.Objects;
+using VirtualFriend.Interfaces;
+using VirtualFriend.Systems;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
+using SysVector = System.Numerics.Vector2;
 
 
 
@@ -35,32 +35,29 @@ namespace VirtualFriend.Entities
             }
         }
 
-        private readonly List<GameObject> _gameObjects;
+        private readonly ObjectManager _objectManager;
 
-        // Приватный или внутренний конструктор, чтобы предотвратить случайное создание через new вне контроля
-        private GameObjectFactory(List<GameObject> gameObjects)
+
+        private GameObjectFactory(ObjectManager objectManager)
         {
-            _gameObjects = gameObjects ?? throw new ArgumentNullException(nameof(gameObjects));
+            _objectManager = objectManager;
         }
 
-        // 2. Метод для инициализации Синглтона на старте программы
-        public static void Initialize(List<GameObject> gameObjects)
+        public static void Initialize(ObjectManager objectManager)
         {
-            if (_instance != null)
-            {
-                throw new InvalidOperationException("Фабрика GameObjectFactory уже инициализирована.");
-            }
-            _instance = new GameObjectFactory(gameObjects);
+            if (_instance != null) throw new InvalidOperationException("Уже инициализирована.");
+            _instance = new GameObjectFactory(objectManager);
         }
 
         // --- Методы создания объектов ---
 
 
         // Метод для создания коробок
-        public BoxObject CreateBox(World world, SysVector spawnPos, float size)
+        public BoxObject CreateBox(SysVector spawnPos, float size, IObjectContainer? container = null)
         {
-            var box = new BoxObject(world, spawnPos, size);
-            _gameObjects.Add(box); // АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В СПИСОК
+            container ??= _objectManager.Desktop;
+            var box = new BoxObject(container.PhysicsWorld, spawnPos, size);
+            _objectManager.Register(box, container);
             return box;
         }
 
@@ -68,10 +65,8 @@ namespace VirtualFriend.Entities
         // TODO: как костыль чтобы не рисовать эти объекты когда свёрнуты, 
         public WindowZoneObject CreateWindowZone(World world, WindowManager.WindowData data, float ppm)
         {
-            // Передаем саму фабрику (this) внутрь зоны, 
-            // чтобы зона могла плодить микро-коробки через фабрику!
             var zone = new WindowZoneObject(world, data, ppm);
-            _gameObjects.Add(zone); // АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В СПИСОК
+            _objectManager.Register(zone); // Окна не кладем в Desktop, они сами контейнеры
             return zone;
         }
 

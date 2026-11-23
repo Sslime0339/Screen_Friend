@@ -1,14 +1,13 @@
 ﻿
 
-using Raylib_cs;
-
-
-using nkast.Aether.Physics2D.Dynamics;
-using nkast.Aether.Physics2D.Common;
 using nkast.Aether.Physics2D.Collision.Shapes;
-using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
-using VirtualFriend.Graphics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Dynamics;
+using Raylib_cs;
 using VirtualFriend.Entities.Objects;
+using VirtualFriend.Graphics;
+using VirtualFriend.Interfaces;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
 
 namespace VirtualFriend.Entities
 {
@@ -17,7 +16,10 @@ namespace VirtualFriend.Entities
         public Body PhysicsBody { get; protected set; }
         public bool IsDestroyed { get; protected set; }
 
-        public WindowZoneObject CurrentWindow { get; set; } = null;
+        public IObjectContainer? CurrentContainer { get; set; }
+
+        // TODO: проверить насколько рационально оставлять public WindowZoneObject? CurrentWindow => CurrentContainer as WindowZoneObject; 
+        public WindowZoneObject? CurrentWindow => CurrentContainer as WindowZoneObject; 
 
         // Первое число: Глобальный слой
         public DrawLayer Layer { get; set; } = DrawLayer.DynamicObjects;

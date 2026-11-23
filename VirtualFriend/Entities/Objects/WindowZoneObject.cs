@@ -20,7 +20,7 @@ using VirtualFriend.Interfaces;
 
 namespace VirtualFriend.Entities.Objects
 {
-    internal class WindowZoneObject : GameObject
+    internal class WindowZoneObject : GameObject, IObjectContainer
     {
         public IntPtr Hwnd { get; private set; }
         public float Width { get; private set; }
@@ -30,23 +30,25 @@ namespace VirtualFriend.Entities.Objects
         public bool WasMaximized { get; set; } = false;
 
 
-
-        public IReadOnlyList<GameObject> MicroObjects => _microObjects;
-
-
-
-
-        private readonly List<GameObject> _microObjects = new List<GameObject>();
-        private readonly List<Body> _innerWalls = new List<Body>();
+        // --- Реализация IObjectContainer ---
+        private readonly ObjectStorage _storage = new();
         private readonly World _localWorld;
-        private readonly World _bodyWorld;
 
+        public World PhysicsWorld => _localWorld;
+        public IReadOnlyList<GameObject> Objects => _storage.Objects;
+        // -----------------------------------
+
+
+
+        private readonly List<Body> _innerWalls = new List<Body>();
+
+        private readonly World _bodyWorld;
 
         private readonly float _ppm;
 
-
-
         private const float WallThickness = 50;
+
+
 
         public WindowZoneObject(World world, WindowManager.WindowData data, float ppm)
         {
@@ -63,12 +65,42 @@ namespace VirtualFriend.Entities.Objects
 
             CreateOuterBody(world);
             BuildInnerBoundaries(_localWorld);
-            SpawnMicroWorldContents(_localWorld);
+            SpawnMicroWorldContents();
 
             this.Layer = DrawLayer.Background;
-
-
         }
+
+
+
+        // --- Методы контракта IObjectContainer ---
+
+        public void AddObject(GameObject obj, SysVector worldPos, AetherVector velocity)
+        {
+            // Если объект телепортируется из другого мира — пересоздаем физику здесь
+            if (obj is ITeleportable teleportableObj && obj.PhysicsBody?.World != _localWorld)
+            {
+                teleportableObj.TeleportToWorld(_localWorld, worldPos, velocity);
+            }
+
+            obj.CurrentContainer = this;
+            _storage.Add(obj);
+        }
+
+        public void RemoveObject(GameObject obj)
+        {
+            _storage.Remove(obj);
+            if (obj.CurrentContainer == this)
+            {
+                obj.CurrentContainer = null;
+            }
+        }
+
+        // ----------------------------------------
+
+
+
+
+
 
         private void CreateOuterBody(World world)
         {
@@ -160,39 +192,18 @@ namespace VirtualFriend.Entities.Objects
         }
 
 
-        private void SpawnMicroWorldContents(World world)
+        private void SpawnMicroWorldContents()
         {
 #if DEBUG
             for (int i = 0; i < 5; i++)
             {
                 SysVector spawnPos = new SysVector(Center.X + (i * 0.2f) - 0.4f, Center.Y - 0.2f);
-                BoxObject newObject = GameObjectFactory.Instance.CreateBox(world, spawnPos, 0.5f);
-                newObject.CurrentWindow = this;
-                _microObjects.Add(newObject);
+                // Фабрика сама создаст тело в this.PhysicsWorld и вызовет AddObject
+                GameObjectFactory.Instance.CreateBox(spawnPos, 0.5f, this);
             }
 #endif
         }
 
-
-        public void TeleportIn(GameObject obj, SysVector worldPos, AetherVector velocity)
-        {
-            if (obj is ITeleportable teleportableObj)
-            {
-                // Переносим физическое тело объекта в локальный мир этого окна
-                teleportableObj.TeleportToWorld(_localWorld, worldPos, velocity);
-
-                // Прописываем «дом»
-                obj.CurrentWindow = this;
-
-                // Перемещаем объект во внутренний список окна
-                _microObjects.Add(obj);
-            }
-        }
-        public void TeleportOut(GameObject obj)
-        {
-            _microObjects.Remove(obj);
-            obj.CurrentWindow = null; // Объект больше не принадлежит этому окну
-        }
 
 
 
@@ -203,11 +214,14 @@ namespace VirtualFriend.Entities.Objects
 
             _localWorld.Step(Math.Min(dt, 1f / 60f));
 
-            for (int i = _microObjects.Count - 1; i >= 0; i--)
+            // Идем с конца, так как объекты внутри могут уничтожиться при сжатии (IsCrushed)
+            for (int i = _storage.Objects.Count - 1; i >= 0; i--)
             {
-                _microObjects[i].Update(dt);
+                _storage.Objects[i].Update(dt);
             }
         }
+
+
         // Новый сверхбыстрый метод отрисовки с использованием буфера глубины
         public void DrawWithDepthMask(RenderEngine renderer, ResourceManager resourceManager, float depthZ)
         {
@@ -243,36 +257,29 @@ namespace VirtualFriend.Entities.Objects
             }
             // 1. РИСУЕМ ОБЪЕКТЫ ВНУТРИ ОКНА
             //if (_microObjects.Count > 0)
+            // 1. Сортируем через хранилище и рисуем внутренние объекты
+            _storage.SortByDepth();
+
+            Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
+
+            renderer.BeginWorldSpace();
+            Rlgl.DrawRenderBatchActive();
+            Rlgl.PushMatrix();
+            Rlgl.Translatef(0f, 0f, depthZ);
+
+            foreach (var obj in _storage.Objects)
             {
-                _microObjects.Sort((a, b) =>
-                {
-                    int layerCompare = a.Layer.CompareTo(b.Layer);
-                    if (layerCompare != 0) return layerCompare;
-                    return a.ZIndex.CompareTo(b.ZIndex);
-                });
-
-                Raylib.BeginScissorMode((int)thisScreenX, (int)thisScreenY, (int)thisScreenW, (int)thisScreenH);
-
-                renderer.BeginWorldSpace(); // Сначала запускаем камеру!
-                Rlgl.DrawRenderBatchActive();
-                Rlgl.PushMatrix();
-                Rlgl.Translatef(0f, 0f, depthZ); // Теперь сдвигаем по Z внутри мирового пространства
-
-                foreach (var obj in _microObjects)
-                {
-                    obj.Draw(renderer, resourceManager);
-                }
-
-
-                ParticleSystem.Instance.DrawForWindow(renderer, this);
-
-
-                Rlgl.DrawRenderBatchActive();
-                Rlgl.PopMatrix();
-                renderer.EndWorldSpace();
-
-                Raylib.EndScissorMode();
+                obj.Draw(renderer, resourceManager);
             }
+
+            ParticleSystem.Instance.DrawForWindow(renderer, this);
+
+            Rlgl.DrawRenderBatchActive();
+            Rlgl.PopMatrix();
+            renderer.EndWorldSpace();
+
+            Raylib.EndScissorMode();
+            
 
             // 2. ЗАПЕЧАТЫВАЕМ ОКНО В БУФЕР ГЛУБИНЫ
             Rlgl.DrawRenderBatchActive();
@@ -356,14 +363,19 @@ namespace VirtualFriend.Entities.Objects
 
         public override void Destroy()
         {
-            foreach (var obj in _microObjects) obj.Destroy();
-            _microObjects.Clear();
+            // Уничтожаем все дочерние объекты с конца списка
+            for (int i = _storage.Objects.Count - 1; i >= 0; i--)
+            {
+                _storage.Objects[i].Destroy();
+            }
+            _storage.Clear(); // Добавьте метод Clear() в ObjectStorage
+
             ClearInnerBoundaries(_localWorld);
             _localWorld.Clear();
 
-
             base.Destroy();
         }
+
 
 
 

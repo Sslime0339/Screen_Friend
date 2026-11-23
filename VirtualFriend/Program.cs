@@ -84,12 +84,9 @@ namespace VirtualFriend
         private static RenderEngine _renderEngine;
         private static InputManager _inputManager;
         private static ResourceManager _resourceManager;
+        private static ObjectManager _objectManager;
 
 
-
-        private static readonly List<GameObject> _allGameObjects = new List<GameObject>();
-
-        private static readonly List<GameObject> _desktopGameObjects = new List<GameObject>();
         private static bool _isRunning = true;
         private static bool _isMenuWindowOpen = false; 
         private static System.Windows.Application? _wpfApp = null;
@@ -125,7 +122,7 @@ namespace VirtualFriend
 
 
 
-            Raylib.InitWindow(workAreaWidth, workAreaHeight, "Raylib-cs + Velcro Physics overlay");
+            Raylib.InitWindow(workAreaWidth, workAreaHeight, "box");
             Raylib.SetTargetFPS(60);
 
             IntPtr ReylibHWnd;
@@ -173,7 +170,9 @@ namespace VirtualFriend
             InitWalls(ppm);
 
 
-            GameObjectFactory.Initialize(_allGameObjects);
+
+            _objectManager = new ObjectManager(_physicsSystem.World);
+            GameObjectFactory.Initialize(_objectManager);
 
 
             _windowManager = new WindowManager(_physicsSystem.World, ppm);
@@ -189,8 +188,8 @@ namespace VirtualFriend
 
 
 #if DEBUG
-            GameObject newObj = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, new SysVector(30, 5), 5);
-            _desktopGameObjects.Add(newObj);
+            GameObjectFactory.Instance.CreateBox(new SysVector(30, 5), 5);
+
 #endif
 
 
@@ -214,21 +213,13 @@ namespace VirtualFriend
 
                 WindowZoneObject WinUnderMouse = GetTopWindowUnderMouse(_inputManager.GetMouseWorldPosition());
                 // ОБЯЗАТЕЛЬНО: Обновляем состояние ввода каждый кадр!
-                _inputManager.Update(_allGameObjects, dt, WinUnderMouse);
+                _inputManager.Update(_objectManager.AllObjects, dt, WinUnderMouse);
 
                 // --- Логика управления ящиками и объектами ---
                 HandleInput(dt);
 
-                // Обновление логики объектов
-                for (int i = _allGameObjects.Count - 1; i >= 0; i--)
-                {
-                    _allGameObjects[i].Update(dt);
-                    if (_allGameObjects[i].IsDestroyed)
-                    {
-                        _desktopGameObjects.Remove(_allGameObjects[i]);
-                        _allGameObjects.RemoveAt(i);
-                    }
-                }
+
+                _objectManager.UpdateAll(dt);
 
 
                 _windowManager.Update(ppm, dt);
@@ -241,7 +232,7 @@ namespace VirtualFriend
                 ParticleSystem.Instance.Update(dt);
 
 
-
+                /*
                 // --- ДВУХУРОВНЕВАЯ СОРТИРОВКА ОТРИСОВКИ ---
                 _desktopGameObjects.Sort((a, b) =>
                 {
@@ -252,7 +243,8 @@ namespace VirtualFriend
                     // 2. Если слои равны, сортируем по внутреннему ZIndex
                     return a.ZIndex.CompareTo(b.ZIndex);
                 });
-
+                */
+                _objectManager.Desktop.Sort();
 
 
 
@@ -285,12 +277,6 @@ namespace VirtualFriend
                     activeWindows[i].DrawWithDepthMask(_renderEngine, _resourceManager, depthZ);
                 }
 
-                _desktopGameObjects.Sort((a, b) =>
-                {
-                    int layerCompare = a.Layer.CompareTo(b.Layer);
-                    if (layerCompare != 0) return layerCompare;
-                    return a.ZIndex.CompareTo(b.ZIndex);
-                });
 
 
                 _renderEngine.BeginWorldSpace();
@@ -298,12 +284,10 @@ namespace VirtualFriend
                 Rlgl.PushMatrix(); 
                 Rlgl.Translatef(0f, 0f, 0.05f);
 
-                foreach (var obj in _desktopGameObjects)
+                
+                foreach (var obj in _objectManager.Desktop.Objects)
                 {
-                    if (!(obj is WindowZoneObject))
-                    {
-                        obj.Draw(_renderEngine, _resourceManager);
-                    }
+                    obj.Draw(_renderEngine, _resourceManager);
                 }
 
 
@@ -350,10 +334,12 @@ namespace VirtualFriend
 
                 // Отрисовка UI текста (пока рисуется жестко поверх всего кода)
                 //_renderEngine.DrawTextWithShadow($"Коробок: {_allGameObjects.Count}", new SysVector(10, 800), 24, Color.Pink);
-
+                /*
 #if DEBUG
                 Raylib.DrawFPS(10, 10);
 #endif
+                */
+
 
                 Raylib.DrawFPS(10, 10);
 
@@ -443,15 +429,14 @@ namespace VirtualFriend
             {
                 // Секретное действие: например, спавн гигантской коробки
                 SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
-                BoxObject giantBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, 3.0f);
-                _desktopGameObjects.Add(giantBox);
-                HandleObjectTeleportation(giantBox, mouseWorldPos, new AetherVector(0, 0));
+                GameObjectFactory.Instance.CreateBox(mouseWorldPos, 3.0f, GetTopWindowUnderMouse(mouseWorldPos));
+                //HandleObjectTeleportation(giantBox, mouseWorldPos, new AetherVector(0, 0));
             }
 
             // --- 2. Очистка сцены (Клавиша X) ---
             if (_inputManager.IsClearPressed())
             {
-                foreach (var obj in _allGameObjects)
+                foreach (var obj in _objectManager.AllObjects)
                 {
                     if (obj is BoxObject)
                     {
@@ -478,7 +463,7 @@ namespace VirtualFriend
             if (_inputManager.IsLButtonPressed() && _draggedObject == null)
             {
                 WindowZoneObject WinUnderMouse = GetTopWindowUnderMouse(currentMouseWorld);
-                foreach (var obj in _allGameObjects)
+                foreach (var obj in _objectManager.AllObjects)
                 {
                     // Проверяем, поддерживает ли объект перетаскивание
                     if (obj is IDraggable draggable)
@@ -532,7 +517,7 @@ namespace VirtualFriend
             if (_inputManager.IsRButtonPressed())
             {
                 WindowZoneObject winUnderMouse = GetTopWindowUnderMouse(currentMouseWorld);
-                foreach (var obj in _allGameObjects)
+                foreach (var obj in _objectManager.AllObjects)
                 {
                     if (obj is IClickable clickable && clickable.IsUnderMouse(currentMouseWorld, winUnderMouse))
                     {
@@ -546,9 +531,9 @@ namespace VirtualFriend
             if (_inputManager.IsMButtonPressed())
             {
                 WindowZoneObject winUnderMouse = GetTopWindowUnderMouse(currentMouseWorld);
-                for (int i = _allGameObjects.Count - 1; i >= 0; i--)
+                for (int i = _objectManager.AllObjects.Count - 1; i >= 0; i--)
                 {
-                    if (_allGameObjects[i] is IClickable clickable && clickable.IsUnderMouse(currentMouseWorld, winUnderMouse))
+                    if (_objectManager.AllObjects[i] is IClickable clickable && clickable.IsUnderMouse(currentMouseWorld, winUnderMouse))
                     {
                         clickable.OnMiddleClick();
                         break;
@@ -565,72 +550,27 @@ namespace VirtualFriend
 
 
 
-        private static void SpawnBoxAtMouse()
+        private static BoxObject SpawnBoxAtMouse()
         {
             SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
             float boxSize = Random.Shared.Next(10) == 0 ? 0.5f : 1.0f;
-
-            BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
-            _desktopGameObjects.Add(newBox);
-            HandleObjectTeleportation(newBox, mouseWorldPos, new AetherVector(0, 0));
+            IObjectContainer target = (IObjectContainer?)GetTopWindowUnderMouse(mouseWorldPos) ?? _objectManager.Desktop;
+            return GameObjectFactory.Instance.CreateBox(mouseWorldPos, boxSize, target);
         }
+
         private static void SpawnBoxAtMouse(AetherVector vecImpulse)
         {
-            SysVector mouseWorldPos = _inputManager.GetMouseWorldPosition();
-            float boxSize = Random.Shared.Next(10) == 0 ? 0.5f : 1.0f;
-
-            BoxObject newBox = GameObjectFactory.Instance.CreateBox(_physicsSystem.World, mouseWorldPos, boxSize);
-            _desktopGameObjects.Add(newBox);
-            HandleObjectTeleportation(newBox, mouseWorldPos, new AetherVector(0, 0));
-
-            newBox.PhysicsBody.ApplyLinearImpulse(vecImpulse);
+            BoxObject newBox = SpawnBoxAtMouse();
+            newBox.PhysicsBody?.ApplyLinearImpulse(vecImpulse);
         }
 
 
         private static void HandleObjectTeleportation(GameObject obj, SysVector currentMouseWorld, AetherVector releaseVelocity)
         {
-            if (obj is ITeleportable teleportableObj)
-            {
-                // Получаем верхнее окно под мышкой
-                WindowZoneObject topWindow = GetTopWindowUnderMouse(currentMouseWorld);
-
-                if (topWindow != null)
-                {
-                    // Если окно под мышкой отличается от текущего окна объекта
-                    if (obj.CurrentWindow != topWindow)
-                    {
-                        // Если объект был внутри какого-то окна, извлекаем его оттуда
-                        if (obj.CurrentWindow != null)
-                        {
-                            obj.CurrentWindow.TeleportOut(obj);
-                        }
-                        // Если объект был на рабочем столе (внутри списка GameObject), удаляем его оттуда
-                        else if (teleportableObj is GameObject gameObj)
-                        {
-                            _desktopGameObjects.Remove(gameObj);
-                        }
-
-                        // Переносим объект в новое окно
-                        topWindow.TeleportIn(obj, currentMouseWorld, releaseVelocity);
-                        //Console.WriteLine("Объект телепортирован в окно");
-                    }
-                }
-                // Если окон под мышкой нет, но объект сейчас находится внутри окна — выносим его на рабочий стол
-                else if (obj.CurrentWindow != null)
-                {
-                    obj.CurrentWindow.TeleportOut(obj);
-                    teleportableObj.TeleportToWorld(_physicsSystem.World, currentMouseWorld, releaseVelocity);
-
-                    // Если это игровой объект, возвращаем его в список отрисовки рабочего стола
-                    if (teleportableObj is GameObject gameObj)
-                    {
-                        _desktopGameObjects.Add(gameObj);
-                    }
-
-                    //Console.WriteLine("Объект телепортирован на рабочий стол");
-                }
-            }
+            IObjectContainer target = (IObjectContainer?)GetTopWindowUnderMouse(currentMouseWorld) ?? _objectManager.Desktop;
+            _objectManager.MoveObject(obj, target, currentMouseWorld, releaseVelocity);
         }
+
 
 
 
@@ -724,7 +664,7 @@ namespace VirtualFriend
             Console.WriteLine($"Окно {minimizedWindow.Hwnd} свернуто. Выталкиваем объекты наружу...");
 
             // Создаем копию списка, так как HandleObjectTeleportation будет модифицировать оригинальный коллекцию внутри окна
-            var objectsToMove = new List<GameObject>(minimizedWindow.MicroObjects);
+            var objectsToMove = new List<GameObject>(minimizedWindow.Objects);
 
             foreach (var obj in objectsToMove)
             {
@@ -747,7 +687,7 @@ namespace VirtualFriend
             Console.WriteLine($"Окно {maximizedWindow.Hwnd} развернуто на весь экран! Собираем объекты рабочего стола...");
 
             // Создаем копию списка объектов рабочего стола, так как будем удалять элементы из него во время итерации
-            var desktopObjectsCopy = new List<GameObject>(_desktopGameObjects);
+            var desktopObjectsCopy = new List<GameObject>(_objectManager.Desktop.Objects);
 
             foreach (var obj in desktopObjectsCopy)
             {
@@ -757,11 +697,7 @@ namespace VirtualFriend
                 SysVector currentPos = new SysVector(obj.PhysicsBody.Position.X, obj.PhysicsBody.Position.Y);
                 AetherVector currentVelocity = obj.PhysicsBody.LinearVelocity;
 
-                // Удаляем с рабочего стола
-                _desktopGameObjects.Remove(obj);
-
-                // Телепортируем внутрь распахнутого окна
-                maximizedWindow.TeleportIn(obj, currentPos, currentVelocity);
+                _objectManager.MoveObject(obj, maximizedWindow, currentPos, currentVelocity);
             }
         }
 
