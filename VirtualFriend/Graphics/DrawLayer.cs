@@ -1,7 +1,4 @@
-﻿
-
-
-namespace VirtualFriend.Scripts
+﻿namespace VirtualFriend.Graphics
 {
     internal enum DrawLayer
     {

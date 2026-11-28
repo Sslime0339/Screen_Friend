@@ -7,32 +7,160 @@
         mc:Ignorable="d"
         Title="Инструкция по управлению"
         Width="450"
-        Height="370"
+        Height="570"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#1A1A1A">
+    <Window.Resources>
+        <!-- Стиль для выделения клавиш и кнопок мыши -->
+        <Style x:Key="KeyBadge" TargetType="Border">
+            <Setter Property="Background" Value="#383838"/>
+            <Setter Property="BorderBrush" Value="#555555"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="6,1"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="KeyText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="DescText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="60*"/>
-            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.RowSpan="2">
-            <TextBlock Text="Управление симуляцией" FontSize="20" FontWeight="Bold" Foreground="#3498DB" Margin="0,0,0,15" HorizontalAlignment="Center"/>
 
-            <Border Background="#262626" CornerRadius="8" Padding="15">
+        <!-- Главный заголовок -->
+        <TextBlock Grid.Row="0"
+                   Text="Управление"
+                   FontSize="22"
+                   FontWeight="Bold"
+                   Foreground="#2196F3"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,15"/>
+
+        <!-- Карточка со списком управления -->
+        <Border Grid.Row="1"
+                Background="#2A2A2A"
+                BorderBrush="#3A3A3A"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="• Клавиша [ C ] — Создать коробку под курсором" Foreground="White" FontSize="14" Margin="0,4"/>
-                    <TextBlock Text="• Клавиша [ X ] — Очистить все коробки со сцены" Foreground="White" FontSize="14" Margin="0,4"/>
-                    <TextBlock Text="• Зажатие ЛКМ — Взять и перетаскивать объект" Foreground="White" FontSize="14" Margin="0,4"/>
-                    <TextBlock Text="• Колёсико мыши — Вращать коробку при удержании" Foreground="White" FontSize="14" Margin="0,4"/>
-                    <!--
-                    <TextBlock Text="• Клавиша [ I ] — Открыть главное меню программы" Foreground="#E67E22" FontSize="14" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                    -->
-                    <TextBlock Text="• Клавиша [ ESC ] — Закрывает программу если &#x0a;закрыто главное меню" Foreground="#E67E22" FontSize="14" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                </StackPanel>
-            </Border>
 
-            <Button Content="Понятно" Width="100" Height="30" Margin="0,15,0,0" HorizontalAlignment="Center" Click="CloseButton_Click"/>
-        </StackPanel>
+                    <!-- Раздел: Мышь -->
+                    <TextBlock Text="🖱️ Мышь" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
+
+                    <DockPanel Margin="0,0,0,6">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="ЛКМ (удержание)" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— удерживать объект: схватить, перетащить и бросить объект" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,0,0,6">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="Колёсико при удержании" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— вращать удерживаемый объект" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,0,0,6">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="ПКМ" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— подбросить ящик вверх" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,0,0,14">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="Нажать на колёсико" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— удалить ящик под курсором" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <!-- Раздел: Клавиатура -->
+                    <TextBlock Text="⌨️ Клавиатура" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
+
+                    <DockPanel Margin="0,0,0,6">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="C" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— создать ящик" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,0,0,6">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="K" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— очистить сцену (удалить все ящики)" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,0,0,6">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="I" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— открыть главное меню (если оно как-то закрылось)" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,0,0,14">
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="Esc" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— закрыть программу (если меню как-то закрылось)" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+
+                    <!-- Раздел: Фишки и секреты -->
+                    <!-- фигня
+                    <TextBlock Text="🪟 Окна и секреты" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
+
+                    <TextBlock Text="• Ящики можно закидывать внутрь окон Windows — при сворачивании окна они выпадают наружу."
+                               Style="{StaticResource DescText}" Margin="0,0,0,6"/>
+
+                    <DockPanel>
+                        <Border Style="{StaticResource KeyBadge}" DockPanel.Dock="Left">
+                            <TextBlock Text="Box" Style="{StaticResource KeyText}"/>
+                        </Border>
+                        <TextBlock Text="— наберите слово (в любой раскладке), чтобы создать гигантский ящик" Style="{StaticResource DescText}"/>
+                    </DockPanel>
+                    -->
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Единая кнопка закрытия -->
+        <Button Grid.Row="2"
+                Content="Понятно"
+                Click="CloseButton_Click"
+                Width="130"
+                Height="34"
+                Margin="0,15,0,0"
+                HorizontalAlignment="Center"
+                Background="#2196F3"
+                Foreground="White"
+                FontWeight="SemiBold"
+                FontSize="14"
+                BorderThickness="0"
+                Cursor="Hand">
+            <Button.Resources>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="6"/>
+                </Style>
+            </Button.Resources>
+        </Button>
     </Grid>
 </Window>

@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-
 using Font = Raylib_cs.Font;
 using SysVector = System.Numerics.Vector2;
 
@@ -10,7 +9,7 @@ using SysVector = System.Numerics.Vector2;
 
 
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Graphics
 {
     internal class RenderEngine
     {

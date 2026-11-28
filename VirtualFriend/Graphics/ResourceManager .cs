@@ -7,7 +7,7 @@ using Raylib_cs;
 
 
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Graphics
 {
     internal class ResourceManager
     {

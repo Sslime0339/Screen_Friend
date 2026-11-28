@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using Genbox.VelcroPhysics.Dynamics;
-using Genbox.VelcroPhysics.Factories;
-using Microsoft.Xna.Framework;
+using nkast.Aether.Physics2D.Dynamics;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Collision.Shapes;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Systems
 {
     internal class PhysicsSystem
     {
@@ -61,7 +62,7 @@ namespace VirtualFriend.Scripts
         }
 
 
-        public static void MoveKinematicBody(Body body, Microsoft.Xna.Framework.Vector2 targetPosition, float dt, float responsiveness = 15f)
+        public static void MoveKinematicBody(Body body, AetherVector targetPosition, float dt, float responsiveness = 15f)
         {
             if (body == null || dt <= 0f) return;
 
@@ -71,7 +72,7 @@ namespace VirtualFriend.Scripts
             }
 
             // Вычисляем вектор расстояния до цели
-            Microsoft.Xna.Framework.Vector2 delta = targetPosition - body.Position;
+            AetherVector delta = targetPosition - body.Position;
 
             // Формула сбалансированного сглаживания, не зависящая от FPS:
             // Показывает, какую часть расстояния тело должно преодолеть за этот кадр.

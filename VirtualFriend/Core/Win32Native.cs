@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace VirtualFriend.Scripts
+namespace VirtualFriend.Core
 {
     internal static class Win32Native
     {
@@ -105,5 +105,9 @@ namespace VirtualFriend.Scripts
 
         [DllImport("user32.dll")]
         public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int GetWindowTextLength(IntPtr hWnd);
+
     }
 }

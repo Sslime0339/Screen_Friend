@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using VirtualFriend.Scripts.GameObjects;
+using VirtualFriend.Entities.Objects;
 
-namespace VirtualFriend.Scripts.Interfaces
+namespace VirtualFriend.Interfaces
 {
     internal interface IClickable
     {
@@ -11,6 +11,8 @@ namespace VirtualFriend.Scripts.Interfaces
         bool IsUnderMouse(System.Numerics.Vector2 mouseWorldPos, WindowZoneObject WinUnderMouse);
 
         // Срабатывает при клике
-        void OnClick();
+        void OnClick(); // Левая кнопка мыши
+        void OnRightClick() { } // Правая кнопка мыши
+        void OnMiddleClick() { } // Средняя кнопка мыши
     }
 }

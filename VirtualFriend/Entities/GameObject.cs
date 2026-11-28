@@ -1,16 +1,25 @@
-﻿using Genbox.VelcroPhysics.Dynamics;
+﻿
+
+using nkast.Aether.Physics2D.Collision.Shapes;
+using nkast.Aether.Physics2D.Common;
+using nkast.Aether.Physics2D.Dynamics;
 using Raylib_cs;
+using VirtualFriend.Entities.Objects;
+using VirtualFriend.Graphics;
+using VirtualFriend.Interfaces;
+using AetherVector = nkast.Aether.Physics2D.Common.Vector2;
 
-
-
-namespace VirtualFriend.Scripts.GameObjects
+namespace VirtualFriend.Entities
 {
     internal abstract class GameObject
     {
         public Body PhysicsBody { get; protected set; }
         public bool IsDestroyed { get; protected set; }
 
-        public WindowZoneObject CurrentWindow { get; set; } = null;
+        public IObjectContainer? CurrentContainer { get; set; }
+
+        // TODO: проверить насколько рационально оставлять public WindowZoneObject? CurrentWindow => CurrentContainer as WindowZoneObject; 
+        public WindowZoneObject? CurrentWindow => CurrentContainer as WindowZoneObject; 
 
         // Первое число: Глобальный слой
         public DrawLayer Layer { get; set; } = DrawLayer.DynamicObjects;
@@ -21,14 +30,15 @@ namespace VirtualFriend.Scripts.GameObjects
         public abstract void Update(float dt);
         public abstract void Draw(RenderEngine renderer, ResourceManager resourceManager);
 
-        public virtual void Destroy(World world) // TODO: убрать ссылку на world
+        public virtual void Destroy()
         {
             IsDestroyed = true;
             if (PhysicsBody != null)
             {
-                PhysicsBody.RemoveFromWorld();
+                PhysicsBody.World?.Remove(PhysicsBody);
                 PhysicsBody = null;
             }
         }
+
     }
 }
